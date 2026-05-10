@@ -4,108 +4,144 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>MediCare Clinic — Live Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #F7F6F2; --surface: #FFFFFF; --border: #E2E0D8;
-    --text: #1A1918; --muted: #787672;
-    --green-bg: #EAF3DE; --green: #3B6D11;
-    --amber-bg: #FAEEDA; --amber: #854F0B;
-    --blue-bg:  #E6F1FB; --blue:  #185FA5;
-    --gray-bg:  #F1EFE8; --gray:  #5F5E5A;
-    --red-bg:   #FCEBEB; --red:   #A32D2D;
-    --purple-bg:#F0EAFB; --purple:#5B2D9E;
-    --font: 'DM Sans', sans-serif; --mono: 'DM Mono', monospace; --radius: 10px;
-  }
-  body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
-  .app { display: grid; grid-template-rows: 56px 1fr; height: 100vh; overflow: hidden; }
-  .main { display: grid; grid-template-columns: 1fr 340px; overflow: hidden; }
-  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
-  .logo { font-size: 15px; font-weight: 600; }
-  .logo span { color: var(--muted); font-weight: 400; }
-  .ws-badge { font-size: 11px; padding: 3px 10px; border-radius: 20px; background: var(--gray-bg); color: var(--gray); display: flex; align-items: center; gap: 5px; }
-  .ws-badge.connected { background: var(--green-bg); color: var(--green); }
-  .ws-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-  .ws-badge.connected .ws-dot { animation: pulse 1.5s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
-  #current-time { font-family: var(--mono); font-size: 13px; color: var(--muted); }
-  .left-panel { display: flex; flex-direction: column; overflow-y: auto; padding: 20px 24px; gap: 16px; }
-  .metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
-  .metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
-  .metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-  .metric-val { font-size: 24px; font-weight: 600; }
-  .metric-val.blue{color:var(--blue)} .metric-val.green{color:var(--green)} .metric-val.amber{color:var(--amber)} .metric-val.purple{color:var(--purple)}
-  .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-  .table-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
-  .table-head h2 { font-size: 14px; font-weight: 600; }
-  .filters { display: flex; gap: 4px; }
-  .filt { font-size: 12px; padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent; cursor: pointer; color: var(--muted); font-family: var(--font); }
-  .filt.on { background: var(--text); color: var(--bg); border-color: var(--text); }
-  table { width: 100%; border-collapse: collapse; }
-  thead th { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 18px; text-align: left; border-bottom: 1px solid var(--border); }
-  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
-  tbody tr:last-child { border-bottom: none; }
-  tbody tr:hover { background: var(--bg); }
-  tbody tr.flash { animation: rowflash 1.8s ease; }
-  @keyframes rowflash { 0%{background:#EAF3DE}100%{background:transparent} }
-  tbody tr.revisit-row { background: #FAF8FF; }
-  td { padding: 11px 18px; font-size: 13px; vertical-align: middle; }
-  .avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
-  .patient-cell { display: flex; align-items: center; gap: 10px; }
-  .patient-name { font-weight: 500; }
-  .patient-phone { font-size: 11px; color: var(--muted); }
-  .time-cell { font-family: var(--mono); font-size: 13px; font-weight: 500; }
-  .badge { font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 500; }
-  .b-confirmed{background:var(--green-bg);color:var(--green)}
-  .b-waiting{background:var(--amber-bg);color:var(--amber)}
-  .b-done{background:var(--gray-bg);color:var(--gray)}
-  .b-cancelled{background:var(--red-bg);color:var(--red)}
-  .b-revisit{background:var(--purple-bg);color:var(--purple)}
-  .reminder-badge { font-size: 10px; padding: 2px 6px; border-radius: 20px; background: var(--blue-bg); color: var(--blue); margin-left: 4px; }
-  .action-btn { font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); background: transparent; cursor: pointer; color: var(--muted); font-family: var(--font); margin-right: 3px; }
-  .action-btn:hover { background: var(--bg); color: var(--text); }
-  .action-btn.revisit-btn { border-color: var(--purple); color: var(--purple); background: var(--purple-bg); }
-  .action-btn.revisit-btn:hover { background: var(--purple); color: white; }
-  .empty-row td { text-align: center; padding: 2.5rem; color: var(--muted); font-size: 13px; }
-  .right-panel { background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
-  .rp-head { padding: 14px 18px; border-bottom: 1px solid var(--border); }
-  .rp-head h3 { font-size: 14px; font-weight: 600; }
-  .rp-head p { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .log-area { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-  .log-item { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.55; }
-  .log-item.info    { background: var(--blue-bg);   color: #0C447C; }
-  .log-item.success { background: var(--green-bg);  color: #3B6D11; }
-  .log-item.warning { background: var(--amber-bg);  color: #633806; }
-  .log-item.error   { background: var(--red-bg);    color: #791F1F; }
-  .log-item.system  { background: var(--gray-bg);   color: var(--muted); }
-  .log-item.reminder{ background: var(--purple-bg); color: #5B2D9E; }
-  .log-time { font-family: var(--mono); font-size: 10px; opacity: 0.6; margin-top: 4px; }
-  .rp-footer { padding: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
-  .rp-footer label { font-size: 11px; color: var(--muted); }
-  .rp-input-row { display: flex; gap: 6px; }
-  .rp-input { flex: 1; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-family: var(--font); outline: none; }
-  .rp-btn { padding: 8px 14px; border-radius: 8px; border: none; background: var(--text); color: var(--bg); cursor: pointer; font-size: 13px; font-family: var(--font); }
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 100; }
-  .modal-overlay.open { display: flex; }
-  .modal { background: var(--surface); border-radius: 14px; padding: 28px; width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
-  .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-  .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
-  .modal-field { margin-bottom: 14px; }
-  .modal-field label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 5px; font-weight: 500; }
-  .modal-field input, .modal-field textarea { width: 100%; font-size: 13px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-family: var(--font); outline: none; }
-  .modal-field input:focus { border-color: var(--purple); }
-  .modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .reminder-info { background: var(--purple-bg); color: var(--purple); font-size: 12px; padding: 10px 12px; border-radius: 8px; margin-top: 4px; line-height: 1.55; }
-  .modal-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
-  .modal-cancel { padding: 9px 18px; border-radius: 8px; border: 1px solid var(--border); background: transparent; cursor: pointer; font-size: 13px; font-family: var(--font); color: var(--muted); }
-  .modal-confirm { padding: 9px 18px; border-radius: 8px; border: none; background: var(--purple); color: white; cursor: pointer; font-size: 13px; font-family: var(--font); font-weight: 500; }
-  .modal-confirm:hover { opacity: 0.9; }
-  .modal-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F7F6F2;--surface:#FFFFFF;--border:#E2E0D8;
+  --text:#1A1918;--muted:#787672;
+  --green-bg:#EAF3DE;--green:#3B6D11;
+  --amber-bg:#FAEEDA;--amber:#854F0B;
+  --blue-bg:#E6F1FB;--blue:#185FA5;
+  --gray-bg:#F1EFE8;--gray:#5F5E5A;
+  --red-bg:#FCEBEB;--red:#A32D2D;
+  --purple-bg:#F0EAFB;--purple:#5B2D9E;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;--radius:10px;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+.app{display:grid;grid-template-rows:56px 48px 1fr;height:100vh;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+.logo{font-size:15px;font-weight:600}.logo span{color:var(--muted);font-weight:400}
+.ws-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--gray-bg);color:var(--gray);display:flex;align-items:center;gap:5px}
+.ws-badge.connected{background:var(--green-bg);color:var(--green)}
+.ws-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.ws-badge.connected .ws-dot{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+#current-time{font-family:var(--mono);font-size:13px;color:var(--muted)}
+
+/* Nav tabs */
+.nav-tabs{background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:4px}
+.nav-tab{font-size:13px;padding:12px 16px;border:none;background:transparent;cursor:pointer;color:var(--muted);font-family:var(--font);border-bottom:2px solid transparent;margin-bottom:-1px}
+.nav-tab.active{color:var(--text);border-bottom-color:var(--text);font-weight:500}
+
+/* Main content */
+.main{overflow:hidden;display:grid;grid-template-columns:1fr 340px}
+.left-panel{display:flex;flex-direction:column;overflow-y:auto;padding:20px 24px;gap:16px}
+.page{display:none}.page.active{display:flex;flex-direction:column;gap:16px}
+
+/* Metrics */
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.metric-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.metric-val{font-size:24px;font-weight:600}
+.metric-val.blue{color:var(--blue)}.metric-val.green{color:var(--green)}.metric-val.amber{color:var(--amber)}.metric-val.purple{color:var(--purple)}
+
+/* Table */
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.table-head h2{font-size:14px;font-weight:600}
+.head-right{display:flex;align-items:center;gap:8px}
+.filters{display:flex;gap:4px}
+.filt{font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);font-family:var(--font)}
+.filt.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.add-btn{font-size:12px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--text);color:var(--bg);cursor:pointer;font-family:var(--font);font-weight:500}
+table{width:100%;border-collapse:collapse}
+thead th{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:10px 18px;text-align:left;border-bottom:1px solid var(--border)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--bg)}
+tbody tr.flash{animation:rowflash 1.8s ease}
+@keyframes rowflash{0%{background:#EAF3DE}100%{background:transparent}}
+tbody tr.revisit-row{background:#FAF8FF}
+td{padding:11px 18px;font-size:13px;vertical-align:middle}
+.avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
+.patient-cell{display:flex;align-items:center;gap:10px}
+.patient-name{font-weight:500}
+.patient-phone{font-size:11px;color:var(--muted)}
+.time-cell{font-family:var(--mono);font-size:13px;font-weight:500}
+.badge{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500}
+.b-confirmed{background:var(--green-bg);color:var(--green)}
+.b-waiting{background:var(--amber-bg);color:var(--amber)}
+.b-done{background:var(--gray-bg);color:var(--gray)}
+.b-cancelled{background:var(--red-bg);color:var(--red)}
+.b-revisit{background:var(--purple-bg);color:var(--purple)}
+.reminder-badge{font-size:10px;padding:2px 6px;border-radius:20px;background:var(--blue-bg);color:var(--blue);margin-left:4px}
+.action-btn{font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);font-family:var(--font);margin-right:3px}
+.action-btn:hover{background:var(--bg);color:var(--text)}
+.action-btn.revisit-btn{border-color:var(--purple);color:var(--purple);background:var(--purple-bg)}
+.action-btn.revisit-btn:hover{background:var(--purple);color:white}
+.empty-row td{text-align:center;padding:2.5rem;color:var(--muted);font-size:13px}
+
+/* Right panel */
+.right-panel{background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.rp-head{padding:14px 18px;border-bottom:1px solid var(--border)}
+.rp-head h3{font-size:14px;font-weight:600}
+.rp-head p{font-size:12px;color:var(--muted);margin-top:2px}
+.log-area{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.log-item{padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.55}
+.log-item.info{background:var(--blue-bg);color:#0C447C}
+.log-item.success{background:var(--green-bg);color:#3B6D11}
+.log-item.warning{background:var(--amber-bg);color:#633806}
+.log-item.error{background:var(--red-bg);color:#791F1F}
+.log-item.system{background:var(--gray-bg);color:var(--muted)}
+.log-item.reminder{background:var(--purple-bg);color:#5B2D9E}
+.log-time{font-family:var(--mono);font-size:10px;opacity:.6;margin-top:4px}
+.rp-footer{padding:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+.rp-footer label{font-size:11px;color:var(--muted)}
+.rp-input-row{display:flex;gap:6px}
+.rp-input{flex:1;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:var(--font);outline:none}
+.rp-btn{padding:8px 14px;border-radius:8px;border:none;background:var(--text);color:var(--bg);cursor:pointer;font-size:13px;font-family:var(--font)}
+
+/* Analytics */
+.analytics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.an-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.an-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.an-head h3{font-size:14px;font-weight:600}
+.an-body{padding:16px 18px}
+.chart-wrap{position:relative;width:100%;height:220px}
+.chart-wrap-sm{position:relative;width:100%;height:180px}
+.an-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:12px;color:var(--muted)}
+.leg-dot{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle}
+.an-tabs{display:flex;gap:4px}
+.an-tab{font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);font-family:var(--font)}
+.an-tab.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+
+/* Modals */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;z-index:100}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:14px;padding:28px;width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.15);max-height:90vh;overflow-y:auto}
+.modal h3{font-size:16px;font-weight:600;margin-bottom:4px}
+.modal-sub{font-size:13px;color:var(--muted);margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.modal-field{margin-bottom:14px}
+.modal-field label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px;font-weight:500}
+.modal-field input,.modal-field select,.modal-field textarea{width:100%;font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:var(--font);outline:none}
+.modal-field input:focus,.modal-field select:focus{border-color:var(--blue)}
+.modal-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.reminder-info{background:var(--purple-bg);color:var(--purple);font-size:12px;padding:10px 12px;border-radius:8px;margin-top:4px;line-height:1.55}
+.modal-actions{display:flex;gap:8px;margin-top:20px;justify-content:flex-end}
+.modal-cancel{padding:9px 18px;border-radius:8px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:13px;font-family:var(--font);color:var(--muted)}
+.modal-confirm{padding:9px 18px;border-radius:8px;border:none;background:var(--blue);color:white;cursor:pointer;font-size:13px;font-family:var(--font);font-weight:500}
+.modal-confirm.purple{background:var(--purple)}
+.modal-confirm:hover{opacity:.9}
+.modal-confirm:disabled{opacity:.5;cursor:not-allowed}
 </style>
 </head>
 <body>
 <div class="app">
+
+  <!-- Topbar -->
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:12px">
       <div class="logo">MediCare Clinic <span>/ Live Dashboard</span></div>
@@ -114,43 +150,111 @@
     <div id="current-time"></div>
   </div>
 
+  <!-- Nav tabs -->
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('appointments',this)">Appointments</button>
+    <button class="nav-tab" onclick="showPage('analytics',this)">Analytics</button>
+  </div>
+
   <div class="main">
     <div class="left-panel">
-      <div class="metrics">
-        <div class="metric"><div class="metric-label">Total Today</div><div class="metric-val blue" id="m-total">—</div></div>
-        <div class="metric"><div class="metric-label">Confirmed</div><div class="metric-val green" id="m-confirmed">—</div></div>
-        <div class="metric"><div class="metric-label">Waiting</div><div class="metric-val amber" id="m-waiting">—</div></div>
-        <div class="metric"><div class="metric-label">Done</div><div class="metric-val" id="m-done">—</div></div>
-        <div class="metric"><div class="metric-label">Revisits</div><div class="metric-val purple" id="m-revisits">—</div></div>
+
+      <!-- APPOINTMENTS PAGE -->
+      <div class="page active" id="page-appointments">
+
+        <div class="metrics">
+          <div class="metric"><div class="metric-label">Total Today</div><div class="metric-val blue" id="m-total">—</div></div>
+          <div class="metric"><div class="metric-label">Confirmed</div><div class="metric-val green" id="m-confirmed">—</div></div>
+          <div class="metric"><div class="metric-label">Waiting</div><div class="metric-val amber" id="m-waiting">—</div></div>
+          <div class="metric"><div class="metric-label">Done</div><div class="metric-val" id="m-done">—</div></div>
+          <div class="metric"><div class="metric-label">Revisits</div><div class="metric-val purple" id="m-revisits">—</div></div>
+        </div>
+
+        <div class="table-card">
+          <div class="table-head">
+            <h2>Appointments — <span id="date-label"></span></h2>
+            <div class="head-right">
+              <div class="filters">
+                <button class="filt on" onclick="setFilter('all',this)">All</button>
+                <button class="filt" onclick="setFilter('confirmed',this)">Confirmed</button>
+                <button class="filt" onclick="setFilter('waiting',this)">Waiting</button>
+                <button class="filt" onclick="setFilter('done',this)">Done</button>
+                <button class="filt" onclick="setFilter('revisit',this)">Revisits</button>
+              </div>
+              <button class="add-btn" onclick="openAddModal()">+ Add Patient</button>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Patient</th><th>Date / Time</th><th>Doctor</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="appt-tbody"></tbody>
+          </table>
+        </div>
+
       </div>
 
-      <div class="table-card">
-        <div class="table-head">
-          <h2>Appointments — <span id="date-label"></span></h2>
-          <div class="filters">
-            <button class="filt on" onclick="setFilter('all',this)">All</button>
-            <button class="filt" onclick="setFilter('confirmed',this)">Confirmed</button>
-            <button class="filt" onclick="setFilter('waiting',this)">Waiting</button>
-            <button class="filt" onclick="setFilter('done',this)">Done</button>
-            <button class="filt" onclick="setFilter('revisit',this)">Revisits</button>
+      <!-- ANALYTICS PAGE -->
+      <div class="page" id="page-analytics">
+
+        <div class="analytics-grid">
+          <div class="metric"><div class="metric-label">This Month</div><div class="metric-val blue" id="an-month">—</div><div style="font-size:11px;color:var(--muted);margin-top:3px">appointments</div></div>
+          <div class="metric"><div class="metric-label">This Week</div><div class="metric-val green" id="an-week">—</div><div style="font-size:11px;color:var(--muted);margin-top:3px">appointments</div></div>
+          <div class="metric"><div class="metric-label">Avg Per Day</div><div class="metric-val amber" id="an-avg">—</div><div style="font-size:11px;color:var(--muted);margin-top:3px">this month</div></div>
+          <div class="metric"><div class="metric-label">Total Revisits</div><div class="metric-val purple" id="an-revisits">—</div><div style="font-size:11px;color:var(--muted);margin-top:3px">all time</div></div>
+        </div>
+
+        <div class="an-card">
+          <div class="an-head">
+            <h3>Appointment trend</h3>
+            <div class="an-tabs">
+              <button class="an-tab on" onclick="switchTrend('daily',this)">Daily</button>
+              <button class="an-tab" onclick="switchTrend('weekly',this)">Weekly</button>
+              <button class="an-tab" onclick="switchTrend('monthly',this)">Monthly</button>
+            </div>
+          </div>
+          <div class="an-body">
+            <div class="legend">
+              <span><span class="leg-dot" style="background:#185FA5"></span>Confirmed</span>
+              <span><span class="leg-dot" style="background:#3B6D11"></span>Done</span>
+              <span><span class="leg-dot" style="background:#854F0B"></span>Cancelled</span>
+            </div>
+            <div class="chart-wrap"><canvas id="trendChart" role="img" aria-label="Appointment trend chart"></canvas></div>
           </div>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Patient</th><th>Date / Time</th><th>Doctor</th><th>Type</th><th>Status</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="appt-tbody"></tbody>
-        </table>
+
+        <div class="an-row">
+          <div class="an-card">
+            <div class="an-head"><h3>By doctor</h3></div>
+            <div class="an-body">
+              <div class="legend" id="doctor-legend"></div>
+              <div class="chart-wrap-sm"><canvas id="doctorChart" role="img" aria-label="Appointments by doctor"></canvas></div>
+            </div>
+          </div>
+          <div class="an-card">
+            <div class="an-head"><h3>Peak hours</h3></div>
+            <div class="an-body">
+              <div class="legend"><span><span class="leg-dot" style="background:#5B2D9E"></span>Appointments</span></div>
+              <div class="chart-wrap-sm"><canvas id="peakChart" role="img" aria-label="Peak appointment hours"></canvas></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="an-card">
+          <div class="an-head"><h3>Monthly overview</h3></div>
+          <div class="an-body">
+            <div class="legend">
+              <span><span class="leg-dot" style="background:#185FA5;border-radius:50%"></span>Total</span>
+              <span><span class="leg-dot" style="background:#5B2D9E;border-radius:50%"></span>Revisits</span>
+            </div>
+            <div class="chart-wrap"><canvas id="monthlyChart" role="img" aria-label="Monthly appointment overview"></canvas></div>
+          </div>
+        </div>
+
       </div>
     </div>
 
+    <!-- Right panel -->
     <div class="right-panel">
-      <div class="rp-head">
-        <h3>Vapi receptionist log</h3>
-        <p>Real-time updates from your AI agent</p>
-      </div>
+      <div class="rp-head"><h3>Vapi receptionist log</h3><p>Real-time updates from your AI agent</p></div>
       <div class="log-area" id="log-area"></div>
       <div class="rp-footer">
         <label>Manual test command</label>
@@ -163,177 +267,433 @@
   </div>
 </div>
 
-<!-- Revisit Modal -->
-<div class="modal-overlay" id="revisit-modal">
+<!-- ADD PATIENT MODAL -->
+<div class="modal-overlay" id="add-modal">
   <div class="modal">
-    <h3>📅 Schedule Revisit</h3>
-    <div class="modal-sub" id="modal-patient-info">Patient info</div>
+    <h3>Add Patient Manually</h3>
+    <div class="modal-sub">Walk-in or phone patient not booked via Vapi</div>
+    <div class="modal-field">
+      <label>Patient Full Name *</label>
+      <input type="text" id="add-name" placeholder="e.g. Raj Kumar" />
+    </div>
+    <div class="modal-field">
+      <label>Phone Number</label>
+      <input type="tel" id="add-phone" placeholder="e.g. 9876543210" />
+    </div>
     <div class="modal-row">
       <div class="modal-field">
-        <label>Revisit Date</label>
-        <input type="date" id="revisit-date" />
+        <label>Date *</label>
+        <input type="date" id="add-date" />
       </div>
       <div class="modal-field">
-        <label>Revisit Time</label>
-        <input type="time" id="revisit-time" value="10:00" />
+        <label>Time *</label>
+        <input type="time" id="add-time" />
       </div>
+    </div>
+    <div class="modal-field">
+      <label>Doctor *</label>
+      <select id="add-doctor">
+        <option value="Dr. Mehta">Dr. Mehta</option>
+        <option value="Dr. Singh">Dr. Singh</option>
+        <option value="Dr. Kaur">Dr. Kaur</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Appointment Type *</label>
+      <select id="add-type">
+        <option value="General Checkup">General Checkup</option>
+        <option value="Dental Cleaning">Dental Cleaning</option>
+        <option value="Blood Test">Blood Test</option>
+        <option value="Follow-up">Follow-up</option>
+        <option value="Consultation">Consultation</option>
+        <option value="Vaccination">Vaccination</option>
+        <option value="Eye Checkup">Eye Checkup</option>
+        <option value="X-Ray">X-Ray</option>
+        <option value="Physiotherapy">Physiotherapy</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Status</label>
+      <select id="add-status">
+        <option value="confirmed">Confirmed</option>
+        <option value="waiting">Waiting</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Notes (optional)</label>
+      <textarea id="add-notes" rows="2" placeholder="Any extra info…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeAddModal()">Cancel</button>
+      <button class="modal-confirm" id="add-confirm-btn" onclick="confirmAdd()">Add Patient</button>
+    </div>
+  </div>
+</div>
+
+<!-- REVISIT MODAL -->
+<div class="modal-overlay" id="revisit-modal">
+  <div class="modal">
+    <h3>Schedule Revisit</h3>
+    <div class="modal-sub" id="modal-patient-info">Patient info</div>
+    <div class="modal-row">
+      <div class="modal-field"><label>Revisit Date *</label><input type="date" id="revisit-date" /></div>
+      <div class="modal-field"><label>Revisit Time *</label><input type="time" id="revisit-time" value="10:00" /></div>
     </div>
     <div class="modal-field">
       <label>Doctor's Notes (optional)</label>
       <textarea id="revisit-notes" rows="2" placeholder="e.g. Follow up on blood test results"></textarea>
     </div>
-    <div class="reminder-info">
-      📞 Your Vapi agent will automatically call the patient on the revisit day to remind them of their appointment. Make sure the patient's phone number is saved.
-    </div>
+    <div class="reminder-info">Your Vapi agent will automatically call the patient on the revisit day to remind them of their appointment.</div>
     <div class="modal-actions">
-      <button class="modal-cancel" onclick="closeModal()">Cancel</button>
-      <button class="modal-confirm" id="confirm-btn" onclick="confirmRevisit()">📅 Schedule & Set Reminder</button>
+      <button class="modal-cancel" onclick="closeRevisitModal()">Cancel</button>
+      <button class="modal-confirm purple" id="revisit-confirm-btn" onclick="confirmRevisit()">Schedule & Set Reminder</button>
     </div>
   </div>
 </div>
 
 <script>
-const COLORS = [['#B5D4F4','#0C447C'],['#9FE1CB','#085041'],['#F5C4B3','#993C1D'],['#F4C0D1','#72243E'],['#FAC775','#633806'],['#C0DD97','#27500A']];
-let appointments = [], filter = 'all', selectedApptId = null, ws;
+const COLORS=[['#B5D4F4','#0C447C'],['#9FE1CB','#085041'],['#F5C4B3','#993C1D'],['#F4C0D1','#72243E'],['#FAC775','#633806'],['#C0DD97','#27500A']];
+const DOCTOR_COLORS=['#185FA5','#3B6D11','#854F0B','#5B2D9E','#A32D2D'];
+let appointments=[],filter='all',selectedApptId=null,ws;
+let trendChart=null,doctorChart=null,peakChart=null,monthlyChart=null;
 
-function connectWS() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}`);
-  ws.onopen = () => { setBadge(true); addLog('system', 'Connected to clinic server.'); };
-  ws.onmessage = (e) => { const { event, data } = JSON.parse(e.data); handleEvent(event, data); };
-  ws.onclose = () => { setBadge(false); addLog('error', 'Disconnected. Reconnecting…'); setTimeout(connectWS, 3000); };
-  ws.onerror = () => ws.close();
+// ── Page nav ──────────────────────────────────────────────────────────────────
+function showPage(name,btn){
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(name==='analytics') buildAnalytics();
 }
 
-function handleEvent(event, data) {
-  if (event === 'init') { appointments = data; render(); addLog('info', `Loaded ${data.length} appointment(s).`); }
-  else if (event === 'appointment_booked') { appointments.push(data); render(); flashRow(data.id); addLog('success', `${data.is_revisit?'🔄 Revisit':'✅ Booked'}: ${data.patient_name} — ${data.date} at ${data.time}`); }
-  else if (event === 'appointment_cancelled') { appointments = appointments.map(a => a.id===data.id?{...a,status:'cancelled'}:a); render(); addLog('warning', `Cancelled appointment #${data.id}`); }
-  else if (event === 'appointment_rescheduled' || event === 'appointment_updated') { appointments = appointments.map(a => a.id===data.id?data:a); render(); flashRow(data.id); addLog('success', `Updated: ${data.patient_name} → ${data.date} at ${data.time}`); }
-  else if (event === 'reminder_sent') { addLog('reminder', `📞 Reminder call sent to ${data.patient_name}`); }
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}`);
+  ws.onopen=()=>{setBadge(true);addLog('system','Connected. Waiting for Vapi events…')};
+  ws.onmessage=(e)=>{const{event,data}=JSON.parse(e.data);handleEvent(event,data)};
+  ws.onclose=()=>{setBadge(false);addLog('error','Disconnected. Reconnecting…');setTimeout(connectWS,3000)};
+  ws.onerror=()=>ws.close();
+}
+
+function handleEvent(event,data){
+  if(event==='init'){appointments=data;render();}
+  else if(event==='appointment_booked'){appointments.push(data);render();flashRow(data.id);addLog('success',`${data.is_revisit?'Revisit':'Booked'}: ${data.patient_name} — ${data.date} at ${data.time}`);}
+  else if(event==='appointment_cancelled'){appointments=appointments.map(a=>a.id===data.id?{...a,status:'cancelled'}:a);render();addLog('warning',`Cancelled: appointment #${data.id}`);}
+  else if(event==='appointment_rescheduled'||event==='appointment_updated'){appointments=appointments.map(a=>a.id===data.id?data:a);render();flashRow(data.id);addLog('success',`Updated: ${data.patient_name} → ${data.date} at ${data.time}`);}
+  else if(event==='reminder_sent'){addLog('reminder',`Reminder call sent to ${data.patient_name}`);}
   updateMetrics();
 }
 
-function render() {
-  const tbody = document.getElementById('appt-tbody');
-  let visible = appointments.filter(a => a.status !== 'cancelled');
-  if (filter === 'revisit') visible = visible.filter(a => a.is_revisit);
-  else if (filter !== 'all') visible = visible.filter(a => a.status === filter);
-  visible.sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+// ── Render appointments ───────────────────────────────────────────────────────
+function render(){
+  const tbody=document.getElementById('appt-tbody');
+  let visible=appointments.filter(a=>a.status!=='cancelled');
+  if(filter==='revisit') visible=visible.filter(a=>a.is_revisit);
+  else if(filter!=='all') visible=visible.filter(a=>a.status===filter);
+  visible.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
 
-  if (!visible.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No appointments found.</td></tr>'; return; }
+  if(!visible.length){tbody.innerHTML='<tr class="empty-row"><td colspan="6">No appointments found.</td></tr>';return;}
 
-  tbody.innerHTML = visible.map((a,i) => {
-    const [bg,fg] = COLORS[i%COLORS.length];
-    const ini = a.patient_name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    const badge = a.is_revisit ? `<span class="badge b-revisit">Revisit</span>` : `<span class="badge b-${a.status}">${cap(a.status)}</span>`;
-    const reminded = a.reminder_sent ? `<span class="reminder-badge">📞 reminded</span>` : '';
-    const dateStr = a.date === todayStr() ? `<span style="font-size:11px;color:var(--green)">Today</span>` : `<span style="font-size:11px;color:var(--muted)">${a.date}</span>`;
-    return `<tr id="row-${a.id}" class="${a.is_revisit?'revisit-row':''}">
+  tbody.innerHTML=visible.map((a,i)=>{
+    const[bg,fg]=COLORS[i%COLORS.length];
+    const ini=a.patient_name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const badge=a.is_revisit?`<span class="badge b-revisit">Revisit</span>`:`<span class="badge b-${a.status}">${cap(a.status)}</span>`;
+    const reminded=a.reminder_sent?`<span class="reminder-badge">reminded</span>`:'';
+    const dateStr=a.date===todayStr()?`<span style="font-size:11px;color:var(--green)">Today</span>`:`<span style="font-size:11px;color:var(--muted)">${a.date}</span>`;
+    return`<tr id="row-${a.id}" class="${a.is_revisit?'revisit-row':''}">
       <td><div class="patient-cell"><div class="avatar" style="background:${bg};color:${fg}">${ini}</div><div><div class="patient-name">${a.patient_name}${reminded}</div>${a.phone?`<div class="patient-phone">${a.phone}</div>`:''}</div></div></td>
       <td><span class="time-cell">${a.time}</span> ${dateStr}</td>
       <td>${a.doctor}</td>
       <td>${a.appointment_type}</td>
       <td>${badge}</td>
-      <td>
-        <button class="action-btn" onclick="markDone(${a.id})">Done</button>
-        <button class="action-btn revisit-btn" onclick="openRevisit(${a.id})">Revisit</button>
-        <button class="action-btn" onclick="cancelAppt(${a.id})">Cancel</button>
-      </td>
+      <td><button class="action-btn" onclick="markDone(${a.id})">Done</button><button class="action-btn revisit-btn" onclick="openRevisit(${a.id})">Revisit</button><button class="action-btn" onclick="cancelAppt(${a.id})">Cancel</button></td>
     </tr>`;
   }).join('');
   updateMetrics();
 }
 
-function updateMetrics() {
-  const t = appointments.filter(a => a.status !== 'cancelled' && a.date === todayStr());
-  const all = appointments.filter(a => a.status !== 'cancelled');
-  document.getElementById('m-total').textContent     = t.length;
-  document.getElementById('m-confirmed').textContent = t.filter(a=>a.status==='confirmed').length;
-  document.getElementById('m-waiting').textContent   = t.filter(a=>a.status==='waiting').length;
-  document.getElementById('m-done').textContent      = t.filter(a=>a.status==='done').length;
-  document.getElementById('m-revisits').textContent  = all.filter(a=>a.is_revisit).length;
+function updateMetrics(){
+  const t=appointments.filter(a=>a.status!=='cancelled'&&a.date===todayStr());
+  const all=appointments.filter(a=>a.status!=='cancelled');
+  document.getElementById('m-total').textContent=t.length;
+  document.getElementById('m-confirmed').textContent=t.filter(a=>a.status==='confirmed').length;
+  document.getElementById('m-waiting').textContent=t.filter(a=>a.status==='waiting').length;
+  document.getElementById('m-done').textContent=t.filter(a=>a.status==='done').length;
+  document.getElementById('m-revisits').textContent=all.filter(a=>a.is_revisit).length;
 }
 
-function flashRow(id) {
-  setTimeout(() => { const r = document.getElementById(`row-${id}`); if(r){r.classList.add('flash');setTimeout(()=>r.classList.remove('flash'),1800);} }, 50);
+function flashRow(id){setTimeout(()=>{const r=document.getElementById(`row-${id}`);if(r){r.classList.add('flash');setTimeout(()=>r.classList.remove('flash'),1800);}},50);}
+function setFilter(f,btn){filter=f;document.querySelectorAll('.filt').forEach(b=>b.classList.remove('on'));btn.classList.add('on');render();}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+
+// ── Add Patient Modal ─────────────────────────────────────────────────────────
+function openAddModal(){
+  document.getElementById('add-name').value='';
+  document.getElementById('add-phone').value='';
+  document.getElementById('add-date').value=todayStr();
+  document.getElementById('add-time').value='10:00';
+  document.getElementById('add-doctor').value='Dr. Mehta';
+  document.getElementById('add-type').value='General Checkup';
+  document.getElementById('add-status').value='confirmed';
+  document.getElementById('add-notes').value='';
+  document.getElementById('add-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('add-name').focus(),100);
 }
 
-function setFilter(f,btn) { filter=f; document.querySelectorAll('.filt').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); render(); }
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-function cap(s) { return s.charAt(0).toUpperCase()+s.slice(1); }
+function closeAddModal(){document.getElementById('add-modal').classList.remove('open');}
+
+async function confirmAdd(){
+  const name  = document.getElementById('add-name').value.trim();
+  const phone = document.getElementById('add-phone').value.trim();
+  const date  = document.getElementById('add-date').value;
+  const time  = document.getElementById('add-time').value;
+  const doctor= document.getElementById('add-doctor').value;
+  const type  = document.getElementById('add-type').value;
+  const status= document.getElementById('add-status').value;
+  const notes = document.getElementById('add-notes').value.trim();
+
+  if(!name){alert('Please enter patient name.');document.getElementById('add-name').focus();return;}
+  if(!date||!time){alert('Please set date and time.');return;}
+
+  const btn=document.getElementById('add-confirm-btn');
+  btn.textContent='Adding…';btn.disabled=true;
+
+  try{
+    const res=await fetch('/api/appointments',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({patient_name:name,phone,date,time,doctor,appointment_type:type,status,notes}),
+    });
+    const data=await res.json();
+    if(data.id){
+      addLog('success',`Manually added: ${name} — ${date} at ${time} with ${doctor}`);
+      closeAddModal();
+    } else {addLog('error','Failed to add patient.');}
+  }catch(err){addLog('error',err.message);}
+
+  btn.textContent='Add Patient';btn.disabled=false;
+}
 
 // ── Revisit Modal ─────────────────────────────────────────────────────────────
-function openRevisit(id) {
-  selectedApptId = id;
-  const a = appointments.find(x=>x.id===id); if(!a) return;
-  document.getElementById('modal-patient-info').textContent = `Patient: ${a.patient_name}  ·  ${a.doctor}  ·  Phone: ${a.phone||'not saved'}`;
-  const d = new Date(); d.setDate(d.getDate()+7);
-  document.getElementById('revisit-date').value = d.toISOString().split('T')[0];
-  document.getElementById('revisit-time').value = a.time||'10:00';
-  document.getElementById('revisit-notes').value = '';
+function openRevisit(id){
+  selectedApptId=id;
+  const a=appointments.find(x=>x.id===id);if(!a)return;
+  document.getElementById('modal-patient-info').textContent=`Patient: ${a.patient_name}  ·  ${a.doctor}  ·  Phone: ${a.phone||'not saved'}`;
+  const d=new Date();d.setDate(d.getDate()+7);
+  document.getElementById('revisit-date').value=d.toISOString().split('T')[0];
+  document.getElementById('revisit-time').value=a.time||'10:00';
+  document.getElementById('revisit-notes').value='';
   document.getElementById('revisit-modal').classList.add('open');
 }
 
-function closeModal() { document.getElementById('revisit-modal').classList.remove('open'); selectedApptId=null; }
+function closeRevisitModal(){document.getElementById('revisit-modal').classList.remove('open');selectedApptId=null;}
 
-async function confirmRevisit() {
-  const date  = document.getElementById('revisit-date').value;
-  const time  = document.getElementById('revisit-time').value;
-  const notes = document.getElementById('revisit-notes').value;
-  if(!date||!time){alert('Please set the date and time.');return;}
-  const btn = document.getElementById('confirm-btn');
-  btn.textContent='Scheduling…'; btn.disabled=true;
-  try {
-    const res  = await fetch('/api/revisit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({appointment_id:selectedApptId,revisit_date:date,revisit_time:time,notes})});
-    const data = await res.json();
+async function confirmRevisit(){
+  const date=document.getElementById('revisit-date').value;
+  const time=document.getElementById('revisit-time').value;
+  const notes=document.getElementById('revisit-notes').value;
+  if(!date||!time){alert('Please set date and time.');return;}
+  const btn=document.getElementById('revisit-confirm-btn');
+  btn.textContent='Scheduling…';btn.disabled=true;
+  try{
+    const res=await fetch('/api/revisit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({appointment_id:selectedApptId,revisit_date:date,revisit_time:time,notes})});
+    const data=await res.json();
     if(data.success){
-      addLog('reminder',`📅 Revisit scheduled for ${data.revisit.patient_name} on ${date} at ${time}`);
-      addLog('reminder', data.reminder?.success ? `📞 Vapi will call the patient on ${date} to remind them` : `ℹ️ Add Vapi API keys in Railway Variables to enable auto reminder calls`);
-      closeModal();
-    } else { addLog('error',`Failed: ${data.error}`); }
-  } catch(err){ addLog('error',err.message); }
-  btn.textContent='📅 Schedule & Set Reminder'; btn.disabled=false;
+      addLog('reminder',`Revisit scheduled for ${data.revisit.patient_name} on ${date} at ${time}`);
+      addLog('reminder',data.reminder?.success?`Vapi will call the patient on ${date}`:`Add Vapi keys in Railway for auto reminder calls`);
+      closeRevisitModal();
+    }else{addLog('error',`Failed: ${data.error}`);}
+  }catch(err){addLog('error',err.message);}
+  btn.textContent='Schedule & Set Reminder';btn.disabled=false;
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
-async function markDone(id) { await fetch(`/api/appointments/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'done'})}); }
-async function cancelAppt(id) { if(!confirm('Cancel this appointment?'))return; await fetch(`/api/appointments/${id}`,{method:'DELETE'}); }
+async function markDone(id){await fetch(`/api/appointments/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'done'})});}
+async function cancelAppt(id){if(!confirm('Cancel this appointment?'))return;await fetch(`/api/appointments/${id}`,{method:'DELETE'});}
 
-// ── Log ───────────────────────────────────────────────────────────────────────
-function addLog(type,text) {
-  const el=document.getElementById('log-area');
-  const d=document.createElement('div'); d.className=`log-item ${type}`;
-  d.innerHTML=`${text}<div class="log-time">${new Date().toLocaleTimeString()}</div>`;
-  el.appendChild(d); el.scrollTop=el.scrollHeight;
+// ── Analytics ─────────────────────────────────────────────────────────────────
+function buildAnalytics(){
+  const all=appointments.filter(a=>a.status!=='cancelled');
+  const now=new Date();
+  const monthStr=todayStr().slice(0,7);
+  const weekAgo=new Date();weekAgo.setDate(weekAgo.getDate()-7);
+
+  const thisMonth=all.filter(a=>a.date.startsWith(monthStr));
+  const thisWeek=all.filter(a=>new Date(a.date)>=weekAgo);
+  const revisits=all.filter(a=>a.is_revisit);
+
+  document.getElementById('an-month').textContent=thisMonth.length;
+  document.getElementById('an-week').textContent=thisWeek.length;
+  document.getElementById('an-avg').textContent=(thisMonth.length/now.getDate()).toFixed(1);
+  document.getElementById('an-revisits').textContent=revisits.length;
+
+  buildTrendChart('daily');
+  buildDoctorChart(all);
+  buildPeakChart(all);
+  buildMonthlyChart(all);
 }
 
-// ── Test ──────────────────────────────────────────────────────────────────────
-async function sendTest() {
-  const inp=document.getElementById('test-input'); const val=inp.value.trim(); if(!val)return;
-  inp.value=''; addLog('info',`Test: "${val}"`);
+function getLast7Days(){
+  const days=[];
+  for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toISOString().split('T')[0]);}
+  return days;
+}
+
+function buildTrendChart(mode){
+  if(trendChart)trendChart.destroy();
+  let labels=[],confirmed=[],done=[],cancelled=[];
+  const all=appointments;
+
+  if(mode==='daily'){
+    const days=getLast7Days();
+    labels=days.map(d=>new Date(d).toLocaleDateString('en-IN',{weekday:'short'}));
+    days.forEach(d=>{
+      confirmed.push(all.filter(a=>a.date===d&&a.status==='confirmed').length);
+      done.push(all.filter(a=>a.date===d&&a.status==='done').length);
+      cancelled.push(all.filter(a=>a.date===d&&a.status==='cancelled').length);
+    });
+  } else if(mode==='weekly'){
+    for(let w=3;w>=0;w--){
+      const end=new Date();end.setDate(end.getDate()-w*7);
+      const start=new Date(end);start.setDate(start.getDate()-6);
+      const endStr=end.toISOString().split('T')[0];
+      const startStr=start.toISOString().split('T')[0];
+      labels.push(`Wk ${4-w}`);
+      confirmed.push(all.filter(a=>a.date>=startStr&&a.date<=endStr&&a.status==='confirmed').length);
+      done.push(all.filter(a=>a.date>=startStr&&a.date<=endStr&&a.status==='done').length);
+      cancelled.push(all.filter(a=>a.date>=startStr&&a.date<=endStr&&a.status==='cancelled').length);
+    }
+  } else {
+    for(let m=5;m>=0;m--){
+      const d=new Date();d.setMonth(d.getMonth()-m);
+      const mStr=d.toISOString().slice(0,7);
+      labels.push(d.toLocaleDateString('en-IN',{month:'short'}));
+      confirmed.push(all.filter(a=>a.date.startsWith(mStr)&&a.status==='confirmed').length);
+      done.push(all.filter(a=>a.date.startsWith(mStr)&&a.status==='done').length);
+      cancelled.push(all.filter(a=>a.date.startsWith(mStr)&&a.status==='cancelled').length);
+    }
+  }
+
+  const gc='rgba(0,0,0,0.06)';const tc='#787672';
+  trendChart=new Chart(document.getElementById('trendChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Confirmed',data:confirmed,backgroundColor:'#185FA5',borderRadius:4,borderSkipped:false},
+      {label:'Done',data:done,backgroundColor:'#3B6D11',borderRadius:4,borderSkipped:false},
+      {label:'Cancelled',data:cancelled,backgroundColor:'#854F0B',borderRadius:4,borderSkipped:false},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11}}},y:{grid:{color:gc},ticks:{color:tc,font:{size:11},precision:0},beginAtZero:true}}}
+  });
+}
+
+function switchTrend(mode,btn){
+  document.querySelectorAll('.an-tab').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  buildTrendChart(mode);
+}
+
+function buildDoctorChart(all){
+  if(doctorChart)doctorChart.destroy();
+  const doctors=[...new Set(all.map(a=>a.doctor))];
+  const counts=doctors.map(d=>all.filter(a=>a.doctor===d).length);
+  const colors=DOCTOR_COLORS.slice(0,doctors.length);
+
+  const legend=document.getElementById('doctor-legend');
+  legend.innerHTML=doctors.map((d,i)=>`<span><span class="leg-dot" style="background:${colors[i]}"></span>${d}</span>`).join('');
+
+  doctorChart=new Chart(document.getElementById('doctorChart'),{
+    type:'doughnut',
+    data:{labels:doctors,datasets:[{data:counts,backgroundColor:colors,borderWidth:0,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:(c)=>` ${c.label}: ${c.raw}`}}}}
+  });
+}
+
+function buildPeakChart(all){
+  if(peakChart)peakChart.destroy();
+  const hours=Array.from({length:9},(_,i)=>i+9);
+  const counts=hours.map(h=>{
+    const hStr=String(h).padStart(2,'0');
+    return all.filter(a=>a.time&&a.time.startsWith(hStr)).length;
+  });
+  const labels=hours.map(h=>h<=12?`${h}am`:`${h-12}pm`);
+  const gc='rgba(0,0,0,0.06)';const tc='#787672';
+  peakChart=new Chart(document.getElementById('peakChart'),{
+    type:'bar',
+    data:{labels,datasets:[{data:counts,backgroundColor:'#5B2D9E',borderRadius:4,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11}}},y:{grid:{color:gc},ticks:{color:tc,font:{size:11},precision:0},beginAtZero:true}}}
+  });
+}
+
+function buildMonthlyChart(all){
+  if(monthlyChart)monthlyChart.destroy();
+  const months=[];const total=[];const revisits=[];
+  for(let m=5;m>=0;m--){
+    const d=new Date();d.setMonth(d.getMonth()-m);
+    const mStr=d.toISOString().slice(0,7);
+    months.push(d.toLocaleDateString('en-IN',{month:'short'}));
+    total.push(all.filter(a=>a.date.startsWith(mStr)).length);
+    revisits.push(all.filter(a=>a.date.startsWith(mStr)&&a.is_revisit).length);
+  }
+  const gc='rgba(0,0,0,0.06)';const tc='#787672';
+  monthlyChart=new Chart(document.getElementById('monthlyChart'),{
+    type:'line',
+    data:{labels:months,datasets:[
+      {label:'Total',data:total,borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,0.08)',fill:true,tension:.4,pointBackgroundColor:'#185FA5',pointRadius:4},
+      {label:'Revisits',data:revisits,borderColor:'#5B2D9E',backgroundColor:'rgba(91,45,158,0.07)',fill:true,tension:.4,pointBackgroundColor:'#5B2D9E',pointRadius:4,borderDash:[5,3]},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11}}},y:{grid:{color:gc},ticks:{color:tc,font:{size:11},precision:0},beginAtZero:true}}}
+  });
+}
+
+// ── Log ───────────────────────────────────────────────────────────────────────
+function addLog(type,text){
+  const el=document.getElementById('log-area');
+  const d=document.createElement('div');d.className=`log-item ${type}`;
+  d.innerHTML=`${text}<div class="log-time">${new Date().toLocaleTimeString()}</div>`;
+  el.appendChild(d);el.scrollTop=el.scrollHeight;
+}
+
+// ── Test command ──────────────────────────────────────────────────────────────
+async function sendTest(){
+  const inp=document.getElementById('test-input');
+  const val=inp.value.trim();if(!val)return;
+  inp.value='';addLog('info',`Test: "${val}"`);
   const lower=val.toLowerCase();
   let fn;
+
   if(lower.includes('book')||lower.includes('add')){
-    const n=val.match(/(?:book|add)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
-    const t=val.match(/(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
-    const dr=val.match(/(?:with\s+)?(Dr\.?\s+[A-Z][a-z]+)/i);
-    fn={name:'book_appointment',arguments:{patient_name:n?n[1]:'Test Patient',time:t?t[1]:'10:00',doctor:dr?dr[1]:'Dr. Mehta',date:todayStr()}};
+    // Fix: extract name as everything between the command word and the time/doctor keywords
+    const afterCmd=val.replace(/^(book|add|schedule)\s+/i,'');
+    const timeMatch=afterCmd.match(/\b(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\b/i);
+    const doctorMatch=afterCmd.match(/(?:with\s+)?(Dr\.?\s+\w+)/i);
+    // Name = everything before "at TIME" or "with Dr"
+    let nameRaw=afterCmd;
+    if(timeMatch) nameRaw=nameRaw.slice(0,nameRaw.toLowerCase().indexOf(timeMatch[0].toLowerCase())).trim();
+    if(doctorMatch&&!timeMatch) nameRaw=nameRaw.slice(0,nameRaw.toLowerCase().indexOf(doctorMatch[0].toLowerCase())).trim();
+    const name=nameRaw.replace(/\s+(at|with|for)\s*$/i,'').trim()||'Test Patient';
+    fn={name:'book_appointment',arguments:{patient_name:name,time:timeMatch?timeMatch[1]:'10:00',doctor:doctorMatch?doctorMatch[1]:'Dr. Mehta',date:todayStr()}};
   } else if(lower.includes('cancel')){
-    const n=val.match(/cancel\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
-    fn={name:'cancel_appointment',arguments:{patient_name:n?n[1]:''}};
-  } else { fn={name:'get_appointments',arguments:{date:todayStr()}}; }
+    const n=val.replace(/^cancel\s+/i,'').trim();
+    fn={name:'cancel_appointment',arguments:{patient_name:n}};
+  } else {
+    fn={name:'get_appointments',arguments:{date:todayStr()}};
+  }
+
   const res=await fetch('/vapi/webhook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:{type:'tool-calls',toolCallList:[{id:'t'+Date.now(),function:fn}]}})});
   const data=await res.json();
   const r=data.results?.[0]?.result;
   if(r){try{const p=JSON.parse(r);addLog(p.success?'success':'error',p.message);}catch{addLog('info',r);}}
 }
 
+// ── Utils ─────────────────────────────────────────────────────────────────────
 function setBadge(c){document.getElementById('ws-badge').className='ws-badge'+(c?' connected':'');document.getElementById('ws-label').textContent=c?'Live':'Disconnected';}
 setInterval(()=>{document.getElementById('current-time').textContent=new Date().toLocaleTimeString('en-IN');},1000);
 document.getElementById('current-time').textContent=new Date().toLocaleTimeString('en-IN');
 document.getElementById('date-label').textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-document.getElementById('revisit-modal').addEventListener('click',(e)=>{if(e.target===e.currentTarget)closeModal();});
+document.getElementById('add-modal').addEventListener('click',(e)=>{if(e.target===e.currentTarget)closeAddModal();});
+document.getElementById('revisit-modal').addEventListener('click',(e)=>{if(e.target===e.currentTarget)closeRevisitModal();});
 connectWS();
 </script>
 </body>
