@@ -1,133 +1,270 @@
 /**
- * database.js — JSON file-based storage
- * Works on Railway free tier with zero native dependencies.
+ * database.js — PostgreSQL database layer
+ * Supports: patient IDs, notes, gender, records search
  */
 
-const fs   = require("fs");
-const path = require("path");
+const { Pool } = require("pg");
 
-const DATA_DIR  = process.env.DATA_DIR || path.join(__dirname, "data");
-const DATA_FILE = path.join(DATA_DIR, "appointments.json");
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+});
 
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, JSON.stringify({ seq: 0, rows: [] }));
+async function init() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS appointments (
+      id               SERIAL PRIMARY KEY,
+      patient_id       TEXT,
+      patient_name     TEXT    NOT NULL,
+      phone            TEXT    DEFAULT '',
+      gender           TEXT    DEFAULT '',
+      date             TEXT    NOT NULL,
+      time             TEXT    NOT NULL,
+      doctor           TEXT    NOT NULL DEFAULT 'Dr. Shittu',
+      appointment_type TEXT    NOT NULL DEFAULT 'General Checkup',
+      status           TEXT    NOT NULL DEFAULT 'confirmed'
+                               CHECK (status IN ('confirmed','waiting','done','cancelled')),
+      notes            TEXT    DEFAULT '',
+      reminder_sent    BOOLEAN DEFAULT FALSE,
+      is_revisit       BOOLEAN DEFAULT FALSE,
+      created_at       TIMESTAMPTZ DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ DEFAULT NOW()
+    );
 
-function load() {
-  try { return JSON.parse(fs.readFileSync(DATA_FILE, "utf8")); }
-  catch { return { seq: 0, rows: [] }; }
+    CREATE INDEX IF NOT EXISTS idx_appt_date      ON appointments(date);
+    CREATE INDEX IF NOT EXISTS idx_appt_status    ON appointments(status);
+    CREATE INDEX IF NOT EXISTS idx_appt_pid       ON appointments(patient_id);
+    CREATE INDEX IF NOT EXISTS idx_appt_name      ON appointments(patient_name);
+  `);
+
+  // Auto-generate patient_id for existing rows that don't have one
+  await pool.query(`
+    UPDATE appointments
+    SET patient_id = 'RL-' || LPAD(id::TEXT, 4, '0')
+    WHERE patient_id IS NULL OR patient_id = ''
+  `);
+
+  console.log("✅ Database ready");
 }
 
-function save(store) { fs.writeFileSync(DATA_FILE, JSON.stringify(store, null, 2)); }
-function now()   { return new Date().toISOString(); }
 function today() { return new Date().toISOString().split("T")[0]; }
 
-function createAppointment(data) {
-  const store = load();
-  store.seq += 1;
-  const appt = {
-    id:               store.seq,
-    patient_name:     data.patient_name,
-    phone:            data.phone             || "",
-    date:             data.date              || today(),
-    time:             data.time,
-    doctor:           data.doctor            || "Dr. Mehta",
-    appointment_type: data.appointment_type  || "General Checkup",
-    status:           data.status            || "confirmed",
-    notes:            data.notes             || "",
-    reminder_sent:    false,
-    is_revisit:       data.appointment_type === "Revisit",
-    created_at:       now(),
-    updated_at:       now(),
-  };
-  store.rows.push(appt);
-  save(store);
-  return appt;
-}
-
-function getAllAppointments() {
-  const { rows } = load();
-  return rows.filter(r => r.status !== "cancelled").sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
-}
-
-function getAppointmentsByDate(date) {
-  const { rows } = load();
-  return rows.filter(r => r.date === date && r.status !== "cancelled").sort((a,b) => a.time.localeCompare(b.time));
-}
-
-function getAppointmentsByDateAndDoctor(date, doctor) {
-  const { rows } = load();
-  return rows.filter(r => r.date === date && r.status !== "cancelled" && (!doctor || r.doctor === doctor));
-}
-
-function getAppointmentById(id) {
-  const { rows } = load();
-  return rows.find(r => r.id === Number(id)) || null;
-}
-
-function findAppointmentByName(name) {
-  const { rows } = load();
-  const lower = name.toLowerCase();
-  return rows.find(r => r.patient_name.toLowerCase().includes(lower) && !["cancelled","done"].includes(r.status)) || null;
-}
-
-function updateAppointmentStatus(id, status) {
-  const store = load();
-  const appt  = store.rows.find(r => r.id === Number(id));
-  if (!appt) return null;
-  appt.status = status; appt.updated_at = now();
-  save(store); return appt;
-}
-
-function updateAppointment(id, data) {
-  const store = load();
-  const appt  = store.rows.find(r => r.id === Number(id));
-  if (!appt) return null;
-  Object.assign(appt, {
-    ...(data.patient_name     && { patient_name:     data.patient_name }),
-    ...(data.phone            && { phone:            data.phone }),
-    ...(data.date             && { date:             data.date }),
-    ...(data.time             && { time:             data.time }),
-    ...(data.doctor           && { doctor:           data.doctor }),
-    ...(data.appointment_type && { appointment_type: data.appointment_type }),
-    ...(data.status           && { status:           data.status }),
-    ...(data.notes            && { notes:            data.notes }),
-    updated_at: now(),
-  });
-  save(store); return appt;
-}
-
-function rescheduleAppointment(id, newDate, newTime) {
-  const store = load();
-  const appt  = store.rows.find(r => r.id === Number(id));
-  if (!appt) return null;
-  if (newDate) appt.date = newDate;
-  if (newTime) appt.time = newTime;
-  appt.status = "confirmed"; appt.updated_at = now();
-  save(store); return appt;
-}
-
-function markReminderSent(id) {
-  const store = load();
-  const appt  = store.rows.find(r => r.id === Number(id));
-  if (!appt) return null;
-  appt.reminder_sent = true; appt.updated_at = now();
-  save(store); return appt;
-}
-
-function getStats() {
-  const rows = getAppointmentsByDate(today());
+function rowToObj(row) {
+  if (!row) return null;
   return {
-    total:     rows.length,
-    confirmed: rows.filter(r => r.status === "confirmed").length,
-    waiting:   rows.filter(r => r.status === "waiting").length,
-    done:      rows.filter(r => r.status === "done").length,
-    revisits:  rows.filter(r => r.is_revisit).length,
+    id:               row.id,
+    patient_id:       row.patient_id,
+    patient_name:     row.patient_name,
+    phone:            row.phone,
+    gender:           row.gender,
+    date:             row.date,
+    time:             row.time,
+    doctor:           row.doctor,
+    appointment_type: row.appointment_type,
+    status:           row.status,
+    notes:            row.notes,
+    reminder_sent:    row.reminder_sent,
+    is_revisit:       row.is_revisit,
+    created_at:       row.created_at,
+    updated_at:       row.updated_at,
   };
+}
+
+// Generate next patient ID
+async function generatePatientId() {
+  const { rows } = await pool.query(`SELECT COUNT(*) as cnt FROM appointments`);
+  const num = parseInt(rows[0].cnt) + 1;
+  return `RL-${String(num).padStart(4, "0")}`;
+}
+
+async function createAppointment(data) {
+  const patient_id = await generatePatientId();
+  const { rows } = await pool.query(
+    `INSERT INTO appointments
+       (patient_id, patient_name, phone, gender, date, time, doctor, appointment_type, status, notes, is_revisit)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     RETURNING *`,
+    [
+      patient_id,
+      data.patient_name,
+      data.phone            || "",
+      data.gender           || "",
+      data.date             || today(),
+      data.time,
+      data.doctor           || "Dr. Shittu",
+      data.appointment_type || "General Checkup",
+      data.status           || "confirmed",
+      data.notes            || "",
+      data.appointment_type === "Revisit",
+    ]
+  );
+  return rowToObj(rows[0]);
+}
+
+async function getAllAppointments() {
+  const { rows } = await pool.query(
+    `SELECT * FROM appointments WHERE status != 'cancelled' ORDER BY date ASC, time ASC`
+  );
+  return rows.map(rowToObj);
+}
+
+async function getAppointmentsByDate(date) {
+  const { rows } = await pool.query(
+    `SELECT * FROM appointments WHERE date=$1 AND status != 'cancelled' ORDER BY time ASC`,
+    [date]
+  );
+  return rows.map(rowToObj);
+}
+
+async function getAppointmentsByDateAndDoctor(date, doctor) {
+  if (doctor) {
+    const { rows } = await pool.query(
+      `SELECT * FROM appointments WHERE date=$1 AND doctor=$2 AND status != 'cancelled'`,
+      [date, doctor]
+    );
+    return rows.map(rowToObj);
+  }
+  return getAppointmentsByDate(date);
+}
+
+async function getAppointmentById(id) {
+  const { rows } = await pool.query(`SELECT * FROM appointments WHERE id=$1`, [id]);
+  return rowToObj(rows[0]);
+}
+
+async function findAppointmentByName(name) {
+  const { rows } = await pool.query(
+    `SELECT * FROM appointments
+     WHERE LOWER(patient_name) LIKE LOWER($1)
+       AND status NOT IN ('cancelled','done')
+     ORDER BY date ASC, time ASC LIMIT 1`,
+    [`%${name}%`]
+  );
+  return rowToObj(rows[0]);
+}
+
+async function updateAppointmentStatus(id, status) {
+  const { rows } = await pool.query(
+    `UPDATE appointments SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
+    [status, id]
+  );
+  return rowToObj(rows[0]);
+}
+
+async function updateAppointment(id, data) {
+  const { rows } = await pool.query(
+    `UPDATE appointments SET
+       patient_name     = COALESCE($1, patient_name),
+       phone            = COALESCE($2, phone),
+       gender           = COALESCE($3, gender),
+       date             = COALESCE($4, date),
+       time             = COALESCE($5, time),
+       doctor           = COALESCE($6, doctor),
+       appointment_type = COALESCE($7, appointment_type),
+       status           = COALESCE($8, status),
+       notes            = COALESCE($9, notes),
+       updated_at       = NOW()
+     WHERE id=$10 RETURNING *`,
+    [
+      data.patient_name     || null,
+      data.phone            || null,
+      data.gender           || null,
+      data.date             || null,
+      data.time             || null,
+      data.doctor           || null,
+      data.appointment_type || null,
+      data.status           || null,
+      data.notes            !== undefined ? data.notes : null,
+      id,
+    ]
+  );
+  return rowToObj(rows[0]);
+}
+
+async function rescheduleAppointment(id, newDate, newTime) {
+  const { rows } = await pool.query(
+    `UPDATE appointments SET
+       date       = COALESCE($1, date),
+       time       = COALESCE($2, time),
+       status     = 'confirmed',
+       updated_at = NOW()
+     WHERE id=$3 RETURNING *`,
+    [newDate || null, newTime || null, id]
+  );
+  return rowToObj(rows[0]);
+}
+
+async function markReminderSent(id) {
+  const { rows } = await pool.query(
+    `UPDATE appointments SET reminder_sent=TRUE, updated_at=NOW() WHERE id=$1 RETURNING *`,
+    [id]
+  );
+  return rowToObj(rows[0]);
+}
+
+// Search patient records by ID, name, or date
+async function searchPatientRecords({ patient_id, name, date }) {
+  let query = `SELECT * FROM appointments WHERE 1=1`;
+  const params = [];
+  let idx = 1;
+
+  if (patient_id) {
+    query += ` AND LOWER(patient_id) = LOWER($${idx++})`;
+    params.push(patient_id);
+  }
+  if (name) {
+    query += ` AND LOWER(patient_name) LIKE LOWER($${idx++})`;
+    params.push(`%${name}%`);
+  }
+  if (date) {
+    query += ` AND date = $${idx++}`;
+    params.push(date);
+  }
+
+  query += ` ORDER BY date DESC, time DESC`;
+
+  const { rows } = await pool.query(query, params);
+  if (!rows.length) return null;
+
+  const visits = rows.map(rowToObj);
+  const first = visits[0];
+
+  return {
+    patient_name: first.patient_name,
+    patient_id:   first.patient_id,
+    phone:        first.phone,
+    gender:       first.gender,
+    visits,
+  };
+}
+
+async function getStats() {
+  const { rows } = await pool.query(
+    `SELECT
+       COUNT(*)                                            AS total,
+       SUM(CASE WHEN status='confirmed' THEN 1 ELSE 0 END) AS confirmed,
+       SUM(CASE WHEN status='waiting'   THEN 1 ELSE 0 END) AS waiting,
+       SUM(CASE WHEN status='done'      THEN 1 ELSE 0 END) AS done,
+       SUM(CASE WHEN is_revisit=TRUE    THEN 1 ELSE 0 END) AS revisits
+     FROM appointments
+     WHERE date=$1 AND status != 'cancelled'`,
+    [today()]
+  );
+  return rows[0];
 }
 
 module.exports = {
-  createAppointment, getAllAppointments, getAppointmentsByDate,
-  getAppointmentsByDateAndDoctor, getAppointmentById, findAppointmentByName,
-  updateAppointmentStatus, updateAppointment, rescheduleAppointment,
-  markReminderSent, getStats,
+  init,
+  createAppointment,
+  getAllAppointments,
+  getAppointmentsByDate,
+  getAppointmentsByDateAndDoctor,
+  getAppointmentById,
+  findAppointmentByName,
+  updateAppointmentStatus,
+  updateAppointment,
+  rescheduleAppointment,
+  markReminderSent,
+  searchPatientRecords,
+  getStats,
 };
