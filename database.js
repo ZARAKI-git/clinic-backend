@@ -221,21 +221,32 @@ async function searchPatientRecords({ patient_id, name, date }) {
     params.push(date);
   }
 
-  query += ` ORDER BY date DESC, time DESC`;
+  query += ` ORDER BY patient_id ASC, date DESC, time DESC`;
 
   const { rows } = await pool.query(query, params);
   if (!rows.length) return null;
 
   const visits = rows.map(rowToObj);
-  const first = visits[0];
 
-  return {
-    patient_name: first.patient_name,
-    patient_id:   first.patient_id,
-    phone:        first.phone,
-    gender:       first.gender,
-    visits,
-  };
+  // Group by patient_id so same-name patients show separately
+  const patientMap = new Map();
+  for (const visit of visits) {
+    const key = visit.patient_id || visit.patient_name;
+    if (!patientMap.has(key)) {
+      patientMap.set(key, {
+        patient_name: visit.patient_name,
+        patient_id:   visit.patient_id,
+        phone:        visit.phone,
+        gender:       visit.gender,
+        visits:       [],
+      });
+    }
+    patientMap.get(key).visits.push(visit);
+  }
+
+  const patients = Array.from(patientMap.values());
+  if (patients.length === 1) return patients[0];
+  return { multiple: true, patients };
 }
 
 async function getStats() {
