@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Ray Lawson — Receptionist Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F7F5F1;--surface:#FFFFFF;--border:#E5E0D8;--border2:#D0CAC0;
+  --text:#1A1714;--muted:#8C8580;--mid:#4A4540;
+  --green:#1A6B3C;--green-bg:#E8F5EE;--green-border:#A8D5BC;
+  --amber:#8B5A00;--amber-bg:#FDF3E0;
+  --blue:#1B4F8A;--blue-bg:#EAF0F8;
+  --red:#8B2020;--red-bg:#F5EAEA;
+  --purple:#5B2D9E;--purple-bg:#F0EAFB;
+  --gray-bg:#F1EFE8;--gray:#5F5E5A;
+  --font:'DM Sans',system-ui,sans-serif;--mono:'DM Mono',monospace;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh;display:grid;grid-template-rows:56px 1fr;overflow:hidden}
+
+/* Topbar */
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.clinic-mark{width:32px;height:32px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.clinic-mark svg{width:16px;height:16px;fill:white}
+.clinic-name{font-size:14px;font-weight:500;color:var(--text)}
+.clinic-name span{color:var(--muted);font-weight:400;font-size:13px;margin-left:4px}
+.role-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--green-bg);color:var(--green);font-weight:500;border:1px solid var(--green-border)}
+.ws-pill{font-size:11px;padding:3px 10px;border-radius:20px;display:flex;align-items:center;gap:5px;background:var(--gray-bg);color:var(--gray)}
+.ws-pill.live{background:var(--green-bg);color:var(--green)}
+.ws-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.ws-pill.live .ws-dot{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.topbar-right{display:flex;align-items:center;gap:10px}
+#clock{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.logout-btn{font-size:12px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);font-family:var(--font)}
+.logout-btn:hover{background:var(--bg);color:var(--text)}
+
+/* Main */
+.main{display:grid;grid-template-columns:1fr 320px;overflow:hidden}
+.left{overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px}
+
+/* Metrics */
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.mc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.mc-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.mc-val{font-size:24px;font-weight:600}
+.mc-val.blue{color:var(--blue)}.mc-val.green{color:var(--green)}.mc-val.amber{color:var(--amber)}.mc-val.purple{color:var(--purple)}
+
+/* Table card */
+.tcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.tcard-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.tcard-head h2{font-size:14px;font-weight:500}
+.head-right{display:flex;align-items:center;gap:8px}
+.filters{display:flex;gap:4px}
+.filt{font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);font-family:var(--font)}
+.filt.on{background:var(--text);color:white;border-color:var(--text)}
+.add-btn{font-size:12px;padding:6px 14px;border-radius:8px;border:none;background:var(--blue);color:white;cursor:pointer;font-family:var(--font);font-weight:500}
+.add-btn:hover{background:#123660}
+table{width:100%;border-collapse:collapse}
+thead th{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:10px 18px;text-align:left;border-bottom:1px solid var(--border)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;cursor:default}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--bg)}
+tbody tr.flash{animation:flash 1.8s ease}
+@keyframes flash{0%{background:#E8F5EE}100%{background:transparent}}
+tbody tr.revisit-row{background:#FAF8FF}
+td{padding:11px 18px;font-size:13px;vertical-align:middle}
+.av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
+.pcell{display:flex;align-items:center;gap:10px}
+.pname{font-weight:500}
+.pphone{font-size:11px;color:var(--muted)}
+.pid{font-family:var(--mono);font-size:11px;color:var(--blue);font-weight:500}
+.timecell{font-family:var(--mono);font-size:13px;font-weight:500}
+.badge{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500}
+.b-confirmed{background:var(--green-bg);color:var(--green)}
+.b-waiting{background:var(--amber-bg);color:var(--amber)}
+.b-done{background:var(--gray-bg);color:var(--gray)}
+.b-revisit{background:var(--purple-bg);color:var(--purple)}
+.b-cancelled{background:var(--red-bg);color:var(--red)}
+.abt{font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);font-family:var(--font);margin-right:3px}
+.abt:hover{background:var(--bg);color:var(--text)}
+.abt.rv{border-color:var(--purple);color:var(--purple);background:var(--purple-bg)}
+.abt.rv:hover{background:var(--purple);color:white}
+.empty td{text-align:center;padding:3rem;color:var(--muted);font-size:13px}
+
+/* Right panel */
+.right{background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.rp-head{padding:14px 18px;border-bottom:1px solid var(--border)}
+.rp-head h3{font-size:14px;font-weight:500}
+.rp-head p{font-size:12px;color:var(--muted);margin-top:2px}
+.log{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.li{padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.55}
+.li.info{background:var(--blue-bg);color:#0C447C}
+.li.success{background:var(--green-bg);color:var(--green)}
+.li.warning{background:var(--amber-bg);color:var(--amber)}
+.li.error{background:var(--red-bg);color:var(--red)}
+.li.system{background:var(--gray-bg);color:var(--muted)}
+.li.reminder{background:var(--purple-bg);color:var(--purple)}
+.lt{font-family:var(--mono);font-size:10px;opacity:.6;margin-top:4px}
+.rp-foot{padding:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+.rp-foot label{font-size:11px;color:var(--muted)}
+.inp-row{display:flex;gap:6px}
+.ri{flex:1;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:var(--font);outline:none}
+.rb{padding:8px 14px;border-radius:8px;border:none;background:var(--text);color:white;cursor:pointer;font-size:13px;font-family:var(--font)}
+
+/* Modals */
+.overlay{position:fixed;inset:0;background:rgba(26,23,20,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:1rem}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:16px;padding:28px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(26,23,20,.2)}
+.modal h3{font-size:16px;font-weight:500;margin-bottom:4px}
+.modal-sub{font-size:13px;color:var(--muted);margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.mf{margin-bottom:14px}
+.mf label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px;font-weight:500;text-transform:uppercase;letter-spacing:.3px}
+.mf input,.mf select,.mf textarea{width:100%;font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:var(--font);outline:none}
+.mf input:focus,.mf select:focus,.mf textarea:focus{border-color:var(--blue)}
+.mrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mactions{display:flex;gap:8px;margin-top:20px;justify-content:flex-end}
+.mcancel{padding:9px 18px;border-radius:8px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:13px;font-family:var(--font);color:var(--muted)}
+.mconfirm{padding:9px 18px;border-radius:8px;border:none;background:var(--blue);color:white;cursor:pointer;font-size:13px;font-family:var(--font);font-weight:500}
+.mconfirm.purple{background:var(--purple)}
+.mconfirm:hover{opacity:.9}
+.mconfirm:disabled{opacity:.5;cursor:not-allowed}
+.rem-info{background:var(--purple-bg);color:var(--purple);font-size:12px;padding:10px 12px;border-radius:8px;margin-top:4px;line-height:1.55}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="clinic-mark"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z"/></svg></div>
+    <div class="clinic-name">Ray Lawson Family Clinic <span>/ Brampton, ON</span></div>
+    <span class="role-badge">Receptionist</span>
+    <div class="ws-pill" id="ws-pill"><div class="ws-dot"></div><span id="ws-lbl">Connecting…</span></div>
+  </div>
+  <div class="topbar-right">
+    <div id="clock"></div>
+    <button class="logout-btn" onclick="logout()">Sign out</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="left">
+    <div class="metrics">
+      <div class="mc"><div class="mc-label">Total today</div><div class="mc-val blue" id="m-total">—</div></div>
+      <div class="mc"><div class="mc-label">Confirmed</div><div class="mc-val green" id="m-confirmed">—</div></div>
+      <div class="mc"><div class="mc-label">Waiting</div><div class="mc-val amber" id="m-waiting">—</div></div>
+      <div class="mc"><div class="mc-label">Done</div><div class="mc-val" id="m-done">—</div></div>
+      <div class="mc"><div class="mc-label">Revisits</div><div class="mc-val purple" id="m-revisits">—</div></div>
+    </div>
+
+    <div class="tcard">
+      <div class="tcard-head">
+        <h2>Appointments — <span id="date-lbl"></span></h2>
+        <div class="head-right">
+          <div class="filters">
+            <button class="filt on" onclick="setF('all',this)">All</button>
+            <button class="filt" onclick="setF('confirmed',this)">Confirmed</button>
+            <button class="filt" onclick="setF('waiting',this)">Waiting</button>
+            <button class="filt" onclick="setF('done',this)">Done</button>
+          </div>
+          <button class="add-btn" onclick="openAdd()">+ Add Patient</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Patient</th><th>ID</th><th>Date / Time</th><th>Doctor</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="rp-head"><h3>Vapi receptionist log</h3><p>Real-time AI agent updates</p></div>
+    <div class="log" id="log"></div>
+    <div class="rp-foot">
+      <label>Test command</label>
+      <div class="inp-row">
+        <input class="ri" id="test-inp" placeholder="book Amit at 10am Dr. Shittu" onkeydown="if(event.key==='Enter')sendTest()"/>
+        <button class="rb" onclick="sendTest()">Send</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD PATIENT MODAL -->
+<div class="overlay" id="add-modal">
+  <div class="modal">
+    <h3>Add Patient</h3>
+    <div class="modal-sub">Walk-in or direct booking — not via Vapi</div>
+    <div class="mf"><label>Full Name *</label><input type="text" id="a-name" placeholder="e.g. Priya Sharma"/></div>
+    <div class="mf"><label>Phone Number</label><input type="tel" id="a-phone" placeholder="+1 647 000 0000"/></div>
+    <div class="mrow">
+      <div class="mf"><label>Gender</label>
+        <select id="a-gender"><option value="male">Male</option><option value="female">Female</option></select>
+      </div>
+      <div class="mf"><label>Date *</label><input type="date" id="a-date"/></div>
+    </div>
+    <div class="mrow">
+      <div class="mf"><label>Time *</label><input type="time" id="a-time"/></div>
+      <div class="mf"><label>Doctor *</label>
+        <select id="a-doctor">
+          <option value="Dr. Shittu">Dr. Shittu</option>
+          <option value="Dr. Bhayana">Dr. Bhayana</option>
+        </select>
+      </div>
+    </div>
+    <div class="mf"><label>Appointment Type *</label>
+      <select id="a-type">
+        <option>General Checkup</option><option>Walk-In Visit</option><option>Follow-up</option>
+        <option>Blood Test</option><option>Vaccination</option><option>Consultation</option>
+        <option>Prescription Renewal</option><option>Physical Exam</option><option>Other</option>
+      </select>
+    </div>
+    <div class="mf"><label>Status</label>
+      <select id="a-status"><option value="confirmed">Confirmed</option><option value="waiting">Waiting</option></select>
+    </div>
+    <div class="mf"><label>Notes (optional)</label><textarea id="a-notes" rows="2" placeholder="Any extra info…"></textarea></div>
+    <div class="mactions">
+      <button class="mcancel" onclick="closeAdd()">Cancel</button>
+      <button class="mconfirm" id="add-btn" onclick="confirmAdd()">Add Patient</button>
+    </div>
+  </div>
+</div>
+
+<!-- REVISIT MODAL -->
+<div class="overlay" id="rv-modal">
+  <div class="modal">
+    <h3>Schedule Revisit</h3>
+    <div class="modal-sub" id="rv-info">Patient info</div>
+    <div class="mrow">
+      <div class="mf"><label>Revisit Date *</label><input type="date" id="rv-date"/></div>
+      <div class="mf"><label>Revisit Time *</label><input type="time" id="rv-time" value="10:00"/></div>
+    </div>
+    <div class="mf"><label>Notes (optional)</label><textarea id="rv-notes" rows="2" placeholder="e.g. Follow up on blood test"></textarea></div>
+    <div class="rem-info">Vapi will automatically call the patient on the revisit day to remind them of their appointment.</div>
+    <div class="mactions">
+      <button class="mcancel" onclick="closeRv()">Cancel</button>
+      <button class="mconfirm purple" id="rv-btn" onclick="confirmRv()">Schedule & Set Reminder</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Auth check
+if(!sessionStorage.getItem('loggedIn')||sessionStorage.getItem('role')!=='receptionist'){window.location.href='login.html';}
+
+const COLORS=[['#B5D4F4','#0C447C'],['#9FE1CB','#085041'],['#F5C4B3','#993C1D'],['#F4C0D1','#72243E'],['#FAC775','#633806'],['#C0DD97','#27500A']];
+let appts=[],filter='all',selId=null,ws;
+
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}`);
+  ws.onopen=()=>{setPill(true);addLog('system','Connected to clinic server.')};
+  ws.onmessage=(e)=>{const{event,data}=JSON.parse(e.data);handleEvt(event,data)};
+  ws.onclose=()=>{setPill(false);addLog('error','Disconnected. Reconnecting…');setTimeout(connectWS,3000)};
+  ws.onerror=()=>ws.close();
+}
+
+function handleEvt(ev,data){
+  if(ev==='init'){appts=data;render();}
+  else if(ev==='appointment_booked'){appts.push(data);render();flash(data.id);addLog('success',`${data.is_revisit?'Revisit':'Booked'}: ${data.patient_name} — ${data.date} at ${data.time}`);}
+  else if(ev==='appointment_cancelled'){appts=appts.map(a=>a.id===data.id?{...a,status:'cancelled'}:a);render();addLog('warning',`Cancelled #${data.id}`);}
+  else if(ev==='appointment_updated'||ev==='appointment_rescheduled'){appts=appts.map(a=>a.id===data.id?data:a);render();flash(data.id);addLog('success',`Updated: ${data.patient_name}`);}
+  else if(ev==='reminder_sent'){addLog('reminder',`Reminder call sent to ${data.patient_name}`);}
+  updateMetrics();
+}
+
+function render(){
+  const tb=document.getElementById('tbody');
+  let vis=appts.filter(a=>a.status!=='cancelled');
+  if(filter!=='all')vis=vis.filter(a=>a.status===filter);
+  vis.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  if(!vis.length){tb.innerHTML='<tr class="empty"><td colspan="7">No appointments found.</td></tr>';return;}
+  tb.innerHTML=vis.map((a,i)=>{
+    const[bg,fg]=COLORS[i%COLORS.length];
+    const ini=a.patient_name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const badge=a.is_revisit?`<span class="badge b-revisit">Revisit</span>`:`<span class="badge b-${a.status}">${cap(a.status)}</span>`;
+    const ds=a.date===todayStr()?`<span style="font-size:11px;color:var(--green)">Today</span>`:`<span style="font-size:11px;color:var(--muted)">${a.date}</span>`;
+    return`<tr id="row-${a.id}" class="${a.is_revisit?'revisit-row':''}">
+      <td><div class="pcell"><div class="av" style="background:${bg};color:${fg}">${ini}</div><div><div class="pname">${a.patient_name}</div>${a.phone?`<div class="pphone">${a.phone}</div>`:''}</div></div></td>
+      <td><span class="pid">${a.patient_id||'—'}</span></td>
+      <td><span class="timecell">${a.time}</span> ${ds}</td>
+      <td>${a.doctor}</td>
+      <td>${a.appointment_type}</td>
+      <td>${badge}</td>
+      <td><button class="abt" onclick="markDone(${a.id})">Done</button><button class="abt rv" onclick="openRv(${a.id})">Revisit</button><button class="abt" onclick="cancelA(${a.id})">Cancel</button></td>
+    </tr>`;
+  }).join('');
+  updateMetrics();
+}
+
+function updateMetrics(){
+  const t=appts.filter(a=>a.status!=='cancelled'&&a.date===todayStr());
+  const all=appts.filter(a=>a.status!=='cancelled');
+  document.getElementById('m-total').textContent=t.length;
+  document.getElementById('m-confirmed').textContent=t.filter(a=>a.status==='confirmed').length;
+  document.getElementById('m-waiting').textContent=t.filter(a=>a.status==='waiting').length;
+  document.getElementById('m-done').textContent=t.filter(a=>a.status==='done').length;
+  document.getElementById('m-revisits').textContent=all.filter(a=>a.is_revisit).length;
+}
+
+function flash(id){setTimeout(()=>{const r=document.getElementById(`row-${id}`);if(r){r.classList.add('flash');setTimeout(()=>r.classList.remove('flash'),1800);}},50);}
+function setF(f,btn){filter=f;document.querySelectorAll('.filt').forEach(b=>b.classList.remove('on'));btn.classList.add('on');render();}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+
+function openAdd(){
+  document.getElementById('a-name').value='';document.getElementById('a-phone').value='';
+  document.getElementById('a-date').value=todayStr();document.getElementById('a-time').value='10:00';
+  document.getElementById('a-notes').value='';
+  document.getElementById('add-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('a-name').focus(),100);
+}
+function closeAdd(){document.getElementById('add-modal').classList.remove('open');}
+
+async function confirmAdd(){
+  const name=document.getElementById('a-name').value.trim();
+  const phone=document.getElementById('a-phone').value.trim();
+  const gender=document.getElementById('a-gender').value;
+  const date=document.getElementById('a-date').value;
+  const time=document.getElementById('a-time').value;
+  const doctor=document.getElementById('a-doctor').value;
+  const type=document.getElementById('a-type').value;
+  const status=document.getElementById('a-status').value;
+  const notes=document.getElementById('a-notes').value.trim();
+  if(!name){alert('Please enter patient name.');return;}
+  if(!date||!time){alert('Please set date and time.');return;}
+  const btn=document.getElementById('add-btn');btn.textContent='Adding…';btn.disabled=true;
+  try{
+    const res=await fetch('/api/appointments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({patient_name:name,phone,gender,date,time,doctor,appointment_type:type,status,notes})});
+    const data=await res.json();
+    if(data.id){addLog('success',`Added: ${name} — ${date} at ${time}`);closeAdd();}
+    else addLog('error','Failed to add patient.');
+  }catch(e){addLog('error',e.message);}
+  btn.textContent='Add Patient';btn.disabled=false;
+}
+
+function openRv(id){
+  selId=id;
+  const a=appts.find(x=>x.id===id);if(!a)return;
+  document.getElementById('rv-info').textContent=`Patient: ${a.patient_name} · ${a.doctor} · ${a.phone||'no phone'}`;
+  const d=new Date();d.setDate(d.getDate()+7);
+  document.getElementById('rv-date').value=d.toISOString().split('T')[0];
+  document.getElementById('rv-time').value=a.time||'10:00';
+  document.getElementById('rv-notes').value='';
+  document.getElementById('rv-modal').classList.add('open');
+}
+function closeRv(){document.getElementById('rv-modal').classList.remove('open');selId=null;}
+
+async function confirmRv(){
+  const date=document.getElementById('rv-date').value;
+  const time=document.getElementById('rv-time').value;
+  const notes=document.getElementById('rv-notes').value;
+  if(!date||!time){alert('Set date and time.');return;}
+  const btn=document.getElementById('rv-btn');btn.textContent='Scheduling…';btn.disabled=true;
+  try{
+    const res=await fetch('/api/revisit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({appointment_id:selId,revisit_date:date,revisit_time:time,notes})});
+    const data=await res.json();
+    if(data.success){addLog('reminder',`Revisit scheduled for ${data.revisit.patient_name} on ${date}`);closeRv();}
+    else addLog('error',`Failed: ${data.error}`);
+  }catch(e){addLog('error',e.message);}
+  btn.textContent='Schedule & Set Reminder';btn.disabled=false;
+}
+
+async function markDone(id){await fetch(`/api/appointments/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'done'})});}
+async function cancelA(id){if(!confirm('Cancel this appointment?'))return;await fetch(`/api/appointments/${id}`,{method:'DELETE'});}
+
+async function sendTest(){
+  const inp=document.getElementById('test-inp');const val=inp.value.trim();if(!val)return;
+  inp.value='';addLog('info',`Test: "${val}"`);
+  const lower=val.toLowerCase();let fn;
+  if(lower.includes('book')||lower.includes('add')){
+    const after=val.replace(/^(book|add)\s+/i,'');
+    const tm=after.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\b/i);
+    const dr=after.match(/Dr\.?\s+\w+/i);
+    let nm=after;if(tm)nm=nm.slice(0,nm.toLowerCase().indexOf(tm[0].toLowerCase())).trim();
+    nm=nm.replace(/\s+(at|with|for)\s*$/i,'').trim()||'Test Patient';
+    fn={name:'book_appointment',arguments:{patient_name:nm,time:tm?tm[1]:'10:00',doctor:dr?dr[0]:'Dr. Shittu',date:todayStr()}};
+  }else if(lower.includes('cancel')){fn={name:'cancel_appointment',arguments:{patient_name:val.replace(/^cancel\s+/i,'').trim()}};}
+  else fn={name:'get_appointments',arguments:{date:todayStr()}};
+  const res=await fetch('/vapi/webhook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:{type:'tool-calls',toolCallList:[{id:'t'+Date.now(),function:fn}]}})});
+  const d=await res.json();const r=d.results?.[0]?.result;
+  if(r){try{const p=JSON.parse(r);addLog(p.success?'success':'error',p.message);}catch{addLog('info',r);}}
+}
+
+function addLog(type,text){
+  const el=document.getElementById('log');
+  const d=document.createElement('div');d.className=`li ${type}`;
+  d.innerHTML=`${text}<div class="lt">${new Date().toLocaleTimeString()}</div>`;
+  el.appendChild(d);el.scrollTop=el.scrollHeight;
+}
+function setPill(c){
+  document.getElementById('ws-pill').className='ws-pill'+(c?' live':'');
+  document.getElementById('ws-lbl').textContent=c?'Live':'Disconnected';
+}
+function logout(){sessionStorage.clear();window.location.href='login.html';}
+setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-CA');},1000);
+document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-CA');
+document.getElementById('date-lbl').textContent=new Date().toLocaleDateString('en-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+document.getElementById('add-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeAdd();});
+document.getElementById('rv-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeRv();});
+connectWS();
+</script>
+</body>
+</html>
