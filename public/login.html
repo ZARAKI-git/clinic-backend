@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Ray Lawson Family Clinic — Staff Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --cream:#FAF8F4;--white:#FFFFFF;--dark:#1A1714;--mid:#4A4540;
+  --muted:#8C8580;--border:#E5E0D8;
+  --blue:#1B4F8A;--blue-light:#EAF0F8;--blue-dark:#123660;
+  --green:#1A6B3C;--green-light:#E8F5EE;
+  --red:#8B2020;--red-light:#F5EAEA;
+  --serif:'Playfair Display',Georgia,serif;
+  --sans:'DM Sans',system-ui,sans-serif;
+}
+body{font-family:var(--sans);background:var(--cream);min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+body::before{content:'';position:fixed;inset:0;background:linear-gradient(135deg,#EAF0F8 0%,#FAF8F4 50%,#E8F5EE 100%);z-index:-1}
+body::after{content:'';position:fixed;top:-200px;right:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(27,79,138,0.06) 0%,transparent 70%);z-index:-1}
+
+.login-wrap{width:100%;max-width:440px;padding:2rem}
+.clinic-header{text-align:center;margin-bottom:2.5rem}
+.clinic-logo{width:56px;height:56px;background:var(--blue);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;box-shadow:0 4px 20px rgba(27,79,138,0.25)}
+.clinic-logo svg{width:28px;height:28px;fill:white}
+.clinic-name{font-family:var(--serif);font-size:22px;font-weight:500;color:var(--dark);letter-spacing:-0.3px;line-height:1.3}
+.clinic-sub{font-size:13px;color:var(--muted);margin-top:4px;font-weight:300}
+.clinic-location{font-size:12px;color:var(--blue);margin-top:6px;font-weight:500;letter-spacing:.3px}
+
+.card{background:var(--white);border-radius:20px;padding:2rem;box-shadow:0 2px 40px rgba(26,23,20,0.08),0 0 0 1px rgba(26,23,20,0.06)}
+.card-title{font-family:var(--serif);font-size:18px;color:var(--dark);margin-bottom:.25rem}
+.card-sub{font-size:13px;color:var(--muted);margin-bottom:1.75rem;font-weight:300}
+
+.role-select{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1.5rem}
+.role-btn{padding:12px;border-radius:12px;border:1.5px solid var(--border);background:transparent;cursor:pointer;font-family:var(--sans);transition:all .2s;text-align:center}
+.role-btn-icon{font-size:20px;margin-bottom:4px}
+.role-btn-label{font-size:12px;font-weight:500;color:var(--mid);display:block}
+.role-btn.selected.doctor{border-color:var(--blue);background:var(--blue-light)}
+.role-btn.selected.doctor .role-btn-label{color:var(--blue)}
+.role-btn.selected.receptionist{border-color:var(--green);background:var(--green-light)}
+.role-btn.selected.receptionist .role-btn-label{color:var(--green)}
+.role-btn:hover{border-color:var(--muted)}
+
+.field{margin-bottom:1rem}
+.field label{font-size:12px;font-weight:500;color:var(--mid);display:block;margin-bottom:6px;letter-spacing:.3px;text-transform:uppercase}
+.field input{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--sans);font-size:14px;color:var(--dark);background:var(--cream);outline:none;transition:border-color .2s}
+.field input:focus{border-color:var(--blue);background:white}
+
+.login-btn{width:100%;padding:13px;border-radius:12px;border:none;background:var(--blue);color:white;font-family:var(--sans);font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;margin-top:.5rem;letter-spacing:.2px}
+.login-btn:hover{background:var(--blue-dark);transform:translateY(-1px);box-shadow:0 4px 16px rgba(27,79,138,0.3)}
+.login-btn:active{transform:translateY(0)}
+
+.error{background:var(--red-light);border:1px solid rgba(139,32,32,.2);color:var(--red);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:1rem;display:none}
+.error.show{display:block}
+
+.hint{text-align:center;margin-top:1.25rem;font-size:12px;color:var(--muted)}
+.hint span{color:var(--blue);font-weight:500}
+
+.footer{text-align:center;margin-top:2rem;font-size:11px;color:var(--muted);font-weight:300}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="clinic-header">
+    <div class="clinic-logo">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z"/></svg>
+    </div>
+    <div class="clinic-name">Ray Lawson Family Clinic</div>
+    <div class="clinic-sub">Staff Portal — Appointment Management System</div>
+    <div class="clinic-location">17 Ray Lawson Blvd, Brampton, ON</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Welcome back</div>
+    <div class="card-sub">Select your role and sign in to continue</div>
+
+    <div class="role-select">
+      <button class="role-btn doctor selected" onclick="selectRole('doctor',this)">
+        <div class="role-btn-icon">👨‍⚕️</div>
+        <span class="role-btn-label">Doctor</span>
+      </button>
+      <button class="role-btn receptionist" onclick="selectRole('receptionist',this)">
+        <div class="role-btn-icon">🗂️</div>
+        <span class="role-btn-label">Receptionist</span>
+      </button>
+    </div>
+
+    <div class="error" id="error-msg">Incorrect username or password. Please try again.</div>
+
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="username" placeholder="Enter your username" autocomplete="username" onkeydown="if(event.key==='Enter')login()"/>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()"/>
+    </div>
+
+    <button class="login-btn" onclick="login()">Sign in</button>
+
+    <div class="hint">
+      Doctor: <span>doctor</span> / <span>doctor123</span> &nbsp;·&nbsp; Receptionist: <span>reception</span> / <span>reception123</span>
+    </div>
+  </div>
+
+  <div class="footer">Ray Lawson Family Clinic &copy; 2026 &nbsp;·&nbsp; Powered by HealthFirst AI</div>
+</div>
+
+<script>
+let selectedRole = 'doctor';
+
+function selectRole(role, btn) {
+  selectedRole = role;
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('error-msg').classList.remove('show');
+}
+
+function login() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+  const error = document.getElementById('error-msg');
+
+  const creds = {
+    doctor: { username: 'doctor', password: 'doctor123', page: 'doctor.html' },
+    receptionist: { username: 'reception', password: 'reception123', page: 'receptionist.html' },
+  };
+
+  const expected = creds[selectedRole];
+  if (username === expected.username && password === expected.password) {
+    sessionStorage.setItem('role', selectedRole);
+    sessionStorage.setItem('loggedIn', 'true');
+    window.location.href = expected.page;
+  } else {
+    error.classList.add('show');
+    document.getElementById('password').value = '';
+    document.getElementById('password').focus();
+  }
+}
+</script>
+</body>
+</html>
