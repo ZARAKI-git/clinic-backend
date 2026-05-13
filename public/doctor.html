@@ -88,6 +88,9 @@ td{padding:11px 18px;font-size:13px;vertical-align:middle}
 .abt:hover{background:var(--bg);color:var(--text)}
 .abt.notes{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
 .abt.notes:hover{background:var(--blue);color:white}
+.abt.rv{border-color:var(--purple);color:var(--purple);background:var(--purple-bg)}
+.abt.rv:hover{background:var(--purple);color:white}
+.rem-info{background:var(--purple-bg);color:var(--purple);font-size:12px;padding:10px 12px;border-radius:8px;margin-top:4px;line-height:1.55}
 .empty td{text-align:center;padding:3rem;color:var(--muted);font-size:13px}
 
 /* ── ANALYTICS PAGE ── */
@@ -195,7 +198,7 @@ td{padding:11px 18px;font-size:13px;vertical-align:middle}
       <div class="thead">
         <h2>Today's Appointments — <span id="date-lbl"></span></h2>
         <div class="filters">
-          <button class="filt on" onclick="setF('all',this)">All</button>
+          <button class="filt on" onclick="setF('all',this)">Active</button>
           <button class="filt" onclick="setF('confirmed',this)">Confirmed</button>
           <button class="filt" onclick="setF('waiting',this)">Waiting</button>
           <button class="filt" onclick="setF('done',this)">Done</button>
@@ -297,6 +300,24 @@ td{padding:11px 18px;font-size:13px;vertical-align:middle}
 
 </div>
 
+<!-- REVISIT MODAL -->
+<div class="overlay" id="rv-modal">
+  <div class="modal">
+    <h3>Schedule Revisit</h3>
+    <div class="modal-sub" id="rv-info">Patient info</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="mf"><label>Revisit Date *</label><input type="date" id="rv-date"/></div>
+      <div class="mf"><label>Revisit Time *</label><input type="time" id="rv-time" value="10:00"/></div>
+    </div>
+    <div class="mf"><label>Doctor's Notes (optional)</label><textarea id="rv-notes" rows="2" placeholder="e.g. Follow up on blood test results"></textarea></div>
+    <div class="rem-info">Vapi will automatically call the patient on the revisit day to remind them of their appointment.</div>
+    <div class="mactions">
+      <button class="mcancel" onclick="closeRv()">Cancel</button>
+      <button class="mconfirm" style="background:var(--purple)" id="rv-btn" onclick="confirmRv()">Schedule & Set Reminder</button>
+    </div>
+  </div>
+</div>
+
 <!-- NOTES MODAL -->
 <div class="overlay" id="notes-modal">
   <div class="modal">
@@ -369,17 +390,34 @@ function handleEvt(ev,data){
 // ── Render ────────────────────────────────────────────────────────────────────
 function render(){
   const tb=document.getElementById('tbody');
-  let vis=appts.filter(a=>a.status!=='cancelled');
-  if(filter==='revisit')vis=vis.filter(a=>a.is_revisit);
-  else if(filter!=='all')vis=vis.filter(a=>a.status===filter);
+  let vis=appts;
+
+  // Tab filtering logic
+  if(filter==='all'){
+    // All tab: only show active appointments (confirmed + waiting)
+    vis=appts.filter(a=>a.status==='confirmed'||a.status==='waiting');
+  } else if(filter==='confirmed'){
+    vis=appts.filter(a=>a.status==='confirmed'&&!a.is_revisit);
+  } else if(filter==='waiting'){
+    vis=appts.filter(a=>a.status==='waiting');
+  } else if(filter==='done'){
+    vis=appts.filter(a=>a.status==='done');
+  } else if(filter==='revisit'){
+    vis=appts.filter(a=>a.is_revisit&&a.status!=='cancelled');
+  } else if(filter==='cancelled'){
+    vis=appts.filter(a=>a.status==='cancelled');
+  }
+
   vis.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
-  if(!vis.length){tb.innerHTML='<tr class="empty"><td colspan="6">No appointments found.</td></tr>';return;}
+  if(!vis.length){tb.innerHTML='<tr class="empty"><td colspan="7">No appointments found.</td></tr>';return;}
   tb.innerHTML=vis.map((a,i)=>{
     const[bg,fg]=COLORS[i%COLORS.length];
     const ini=a.patient_name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const badge=a.is_revisit?`<span class="badge b-revisit">Revisit</span>`:`<span class="badge b-${a.status}">${cap(a.status)}</span>`;
     const ds=a.date===todayStr()?`<span style="font-size:11px;color:var(--green)">Today</span>`:`<span style="font-size:11px;color:var(--muted)">${a.date}</span>`;
     const hasNotes=a.notes&&a.notes.length>10;
+    const isDone=a.status==='done';
+    const isCancelled=a.status==='cancelled';
     return`<tr id="row-${a.id}" class="${a.is_revisit?'revisit-row':''}">
       <td><div class="pcell"><div class="av" style="background:${bg};color:${fg}">${ini}</div><div><div class="pname">${a.patient_name}</div>${a.phone?`<div class="pphone">${a.phone}</div>`:''}</div></div></td>
       <td><span class="pid-badge">${a.patient_id||'—'}</span></td>
@@ -387,7 +425,8 @@ function render(){
       <td>${a.appointment_type}</td>
       <td>${badge}</td>
       <td>
-        <button class="abt" onclick="markDone(${a.id})">Done</button>
+        ${!isDone&&!isCancelled?`<button class="abt" onclick="markDone(${a.id})">Done</button>`:''}
+        ${!isDone&&!isCancelled?`<button class="abt rv" onclick="openRevisit(${a.id})">Revisit</button>`:''}
         <button class="abt notes" onclick="openNotes(${a.id})">${hasNotes?'Edit Notes':'Add Notes'}</button>
       </td>
     </tr>`;
@@ -409,7 +448,39 @@ function flash(id){setTimeout(()=>{const r=document.getElementById(`row-${id}`);
 function setF(f,btn){filter=f;document.querySelectorAll('.filt').forEach(b=>b.classList.remove('on'));btn.classList.add('on');render();}
 function todayStr(){return new Date().toISOString().split('T')[0];}
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
-async function markDone(id){await fetch(`/api/appointments/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'done'})});}
+async function markDone(id){
+  await fetch(`/api/appointments/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'done'})});
+  // Switch to Done tab automatically
+  const doneBtn=document.querySelector('.filt[onclick*="done"]');
+  if(doneBtn&&filter==='all')render();
+}
+
+function openRv(id){
+  selApptId=id;
+  const a=appts.find(x=>x.id===id);if(!a)return;
+  document.getElementById('rv-info').textContent=`Patient: ${a.patient_name} · ${a.doctor} · Phone: ${a.phone||'not saved'}`;
+  const d=new Date();d.setDate(d.getDate()+7);
+  document.getElementById('rv-date').value=d.toISOString().split('T')[0];
+  document.getElementById('rv-time').value=a.time||'10:00';
+  document.getElementById('rv-notes').value='';
+  document.getElementById('rv-modal').classList.add('open');
+}
+function closeRv(){document.getElementById('rv-modal').classList.remove('open');}
+
+async function confirmRv(){
+  const date=document.getElementById('rv-date').value;
+  const time=document.getElementById('rv-time').value;
+  const notes=document.getElementById('rv-notes').value;
+  if(!date||!time){alert('Set date and time.');return;}
+  const btn=document.getElementById('rv-btn');btn.textContent='Scheduling…';btn.disabled=true;
+  try{
+    const res=await fetch('/api/revisit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({appointment_id:selApptId,revisit_date:date,revisit_time:time,notes})});
+    const data=await res.json();
+    if(data.success){closeRv();}
+    else alert(`Failed: ${data.error}`);
+  }catch(e){alert(e.message);}
+  btn.textContent='Schedule & Set Reminder';btn.disabled=false;
+}
 
 // ── Notes Modal ───────────────────────────────────────────────────────────────
 function openNotes(id){
@@ -579,6 +650,7 @@ setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocal
 document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-CA');
 document.getElementById('date-lbl').textContent=new Date().toLocaleDateString('en-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 document.getElementById('notes-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeNotes();});
+document.getElementById('rv-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeRv();});
 connectWS();
 </script>
 </body>
