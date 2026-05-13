@@ -18,7 +18,7 @@ const VAPI_PHONE_NUMBER_ID = process.env.VAPI_PHONE_NUMBER_ID   || "";
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), { index: false }));
 
 // Serve login as default
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "public", "login.html")));
