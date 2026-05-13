@@ -281,6 +281,7 @@ td{padding:11px 18px;font-size:13px;vertical-align:middle}
       </div>
     </div>
 
+    <div id="multi-results"></div>
     <div class="patient-card" id="patient-card">
       <div class="pc-head">
         <div class="pc-info">
@@ -576,6 +577,13 @@ async function searchPatient(){
   const name=document.getElementById('search-name').value.trim();
   const date=document.getElementById('search-date').value;
 
+  if(!pid&&!name&&!date){alert('Please enter a Patient ID, name, or date.');return;}
+
+  // Clear previous results
+  document.getElementById('patient-card').classList.remove('show');
+  document.getElementById('search-empty').style.display='none';
+  document.getElementById('multi-results').innerHTML='';
+
   let url='/api/patient-records?';
   if(pid)url+=`patient_id=${encodeURIComponent(pid)}&`;
   if(name)url+=`name=${encodeURIComponent(name)}&`;
@@ -583,32 +591,69 @@ async function searchPatient(){
 
   try{
     const res=await fetch(url);
-    const data=await res.json();
-    if(!data||!data.patient_name){
-      document.getElementById('patient-card').classList.remove('show');
+    if(res.status===404){
       document.getElementById('search-empty').style.display='block';
       return;
     }
-    document.getElementById('search-empty').style.display='none';
-    showPatientCard(data);
+    const data=await res.json();
+    if(!data){document.getElementById('search-empty').style.display='block';return;}
+
+    if(data.multiple){
+      // Multiple patients with same name — show all
+      showMultiplePatients(data.patients);
+    } else {
+      showPatientCard(data);
+    }
   }catch(e){
     // Fallback: search local appointments
-    let found=appts.filter(a=>a.status!=='cancelled');
+    let found=appts;
     if(pid)found=found.filter(a=>a.patient_id&&a.patient_id.toLowerCase()===pid.toLowerCase());
     else if(name)found=found.filter(a=>a.patient_name.toLowerCase().includes(name.toLowerCase()));
     if(date)found=found.filter(a=>a.date===date);
-    if(!found.length){
-      document.getElementById('patient-card').classList.remove('show');
-      document.getElementById('search-empty').style.display='block';
-      return;
+    if(!found.length){document.getElementById('search-empty').style.display='block';return;}
+
+    // Group by patient_id
+    const map=new Map();
+    for(const v of found){
+      const key=v.patient_id||v.patient_name;
+      if(!map.has(key))map.set(key,{patient_name:v.patient_name,patient_id:v.patient_id,phone:v.phone,gender:v.gender,visits:[]});
+      map.get(key).visits.push(v);
     }
-    document.getElementById('search-empty').style.display='none';
-    const p=found[0];
-    showPatientCard({patient_name:p.patient_name,patient_id:p.patient_id,phone:p.phone,gender:p.gender,visits:found});
+    const patients=Array.from(map.values());
+    if(patients.length===1)showPatientCard(patients[0]);
+    else showMultiplePatients(patients);
   }
 }
 
+function showMultiplePatients(patients){
+  const container=document.getElementById('multi-results');
+  container.innerHTML=`
+    <div style="background:var(--amber-bg);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:12px;font-size:13px;color:var(--amber)">
+      Found <strong>${patients.length} patients</strong> with this name. Click a patient to view their full records.
+    </div>
+    ${patients.map(p=>`
+      <div onclick="showPatientCard(${JSON.stringify(p).replace(/"/g,'&quot;')})" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:background .15s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='var(--surface)'">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:38px;height:38px;border-radius:50%;background:var(--blue-bg);color:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px">${p.patient_name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+          <div>
+            <div style="font-weight:500;font-size:14px">${p.patient_name}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">${p.phone||'No phone'} · ${p.gender||'Gender not set'}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:var(--mono);font-size:12px;background:var(--blue-bg);color:var(--blue);padding:3px 8px;border-radius:5px;font-weight:500">${p.patient_id||'No ID'}</span>
+          <span style="font-size:12px;color:var(--muted)">${p.visits.length} visit${p.visits.length!==1?'s':''}</span>
+          <span style="color:var(--muted);font-size:16px">→</span>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
 function showPatientCard(data){
+  // Hide multi results when showing single patient
+  document.getElementById('multi-results').innerHTML='';
+
   const ini=data.patient_name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('pc-avatar').textContent=ini;
   document.getElementById('pc-name').textContent=data.patient_name;
