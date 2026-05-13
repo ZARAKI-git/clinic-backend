@@ -156,10 +156,11 @@ td{padding:11px 18px;font-size:13px;vertical-align:middle}
         <h2>Appointments — <span id="date-lbl"></span></h2>
         <div class="head-right">
           <div class="filters">
-            <button class="filt on" onclick="setF('all',this)">All</button>
+            <button class="filt on" onclick="setF('all',this)">Active</button>
             <button class="filt" onclick="setF('confirmed',this)">Confirmed</button>
             <button class="filt" onclick="setF('waiting',this)">Waiting</button>
             <button class="filt" onclick="setF('done',this)">Done</button>
+            <button class="filt" onclick="setF('revisit',this)">Revisits</button>
           </div>
           <button class="add-btn" onclick="openAdd()">+ Add Patient</button>
         </div>
@@ -269,8 +270,20 @@ function handleEvt(ev,data){
 
 function render(){
   const tb=document.getElementById('tbody');
-  let vis=appts.filter(a=>a.status!=='cancelled');
-  if(filter!=='all')vis=vis.filter(a=>a.status===filter);
+  let vis=appts;
+
+  if(filter==='all'){
+    vis=appts.filter(a=>a.status==='confirmed'||a.status==='waiting');
+  } else if(filter==='confirmed'){
+    vis=appts.filter(a=>a.status==='confirmed'&&!a.is_revisit);
+  } else if(filter==='waiting'){
+    vis=appts.filter(a=>a.status==='waiting');
+  } else if(filter==='done'){
+    vis=appts.filter(a=>a.status==='done');
+  } else if(filter==='revisit'){
+    vis=appts.filter(a=>a.is_revisit&&a.status!=='cancelled');
+  }
+
   vis.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
   if(!vis.length){tb.innerHTML='<tr class="empty"><td colspan="7">No appointments found.</td></tr>';return;}
   tb.innerHTML=vis.map((a,i)=>{
@@ -278,6 +291,7 @@ function render(){
     const ini=a.patient_name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const badge=a.is_revisit?`<span class="badge b-revisit">Revisit</span>`:`<span class="badge b-${a.status}">${cap(a.status)}</span>`;
     const ds=a.date===todayStr()?`<span style="font-size:11px;color:var(--green)">Today</span>`:`<span style="font-size:11px;color:var(--muted)">${a.date}</span>`;
+    const isDone=a.status==='done';
     return`<tr id="row-${a.id}" class="${a.is_revisit?'revisit-row':''}">
       <td><div class="pcell"><div class="av" style="background:${bg};color:${fg}">${ini}</div><div><div class="pname">${a.patient_name}</div>${a.phone?`<div class="pphone">${a.phone}</div>`:''}</div></div></td>
       <td><span class="pid">${a.patient_id||'—'}</span></td>
@@ -285,7 +299,11 @@ function render(){
       <td>${a.doctor}</td>
       <td>${a.appointment_type}</td>
       <td>${badge}</td>
-      <td><button class="abt" onclick="markDone(${a.id})">Done</button><button class="abt rv" onclick="openRv(${a.id})">Revisit</button><button class="abt" onclick="cancelA(${a.id})">Cancel</button></td>
+      <td>
+        ${!isDone?`<button class="abt" onclick="markDone(${a.id})">Done</button>`:''}
+        ${!isDone?`<button class="abt rv" onclick="openRv(${a.id})">Revisit</button>`:''}
+        <button class="abt" style="border-color:var(--red);color:var(--red)" onclick="cancelA(${a.id})">Cancel</button>
+      </td>
     </tr>`;
   }).join('');
   updateMetrics();
