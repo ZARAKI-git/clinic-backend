@@ -383,7 +383,7 @@ async function confirmRv(){
 }
 
 async function markDone(id){await fetch(`/api/appointments/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'done'})});}
-async function cancelA(id){if(!confirm('Cancel this appointment?'))return;await fetch(`/api/appointments/${id}`,{method:'DELETE'});}
+async function cancelA(id){if(!confirm('Cancel this appointment?'))return;const res=await fetch(`/api/appointments/${id}`,{method:'DELETE'});if(res.ok){appts=appts.map(a=>a.id===id?{...a,status:'cancelled'}:a);render();addLog('warning',`Cancelled appointment #${id}`);}}
 
 async function sendTest(){
   const inp=document.getElementById('test-inp');const val=inp.value.trim();if(!val)return;
