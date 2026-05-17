@@ -182,7 +182,7 @@ app.patch("/api/appointments/:id", async (req, res) => {
 
 app.delete("/api/appointments/:id", async (req, res) => {
   await db.updateAppointmentStatus(req.params.id, "cancelled");
-  broadcast("appointment_cancelled", { id: req.params.id, status: "cancelled" });
+  broadcast("appointment_cancelled", { id: Number(req.params.id), status: "cancelled" });
   res.json({ success: true });
 });
 
